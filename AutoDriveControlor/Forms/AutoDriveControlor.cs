@@ -5,6 +5,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using AutoDriveControlor.Classes;
+using System.Drawing;
+using System.IO;
+using System.Diagnostics;
 
 namespace AutoDriveControlor.Forms
 {
@@ -12,59 +15,41 @@ namespace AutoDriveControlor.Forms
 	{
 		Task NetMQTask;
 		NetMQPoller MainPoller = new();
-		NetMQPoller PbPoller = new();
-		NetMQQueue<Bitmap> FrameQueue = new();
-		NetMQQueue<NetMQMessage> CommandQueue = new();
 		NetMQTimer ConnectionTimer = new(TimeSpan.FromSeconds(1));
+		NetMQQueue<NetMQMessage> CommandQueue = new();
 		PublisherSocket CommandPub = new();
 		SubscriberSocket StateSub = new();
-		SubscriberSocket CameraSub = new();
+
 		StateValues CurrentState = new();
 
-		void NetMQThreadFunc()
+		private void NetMQThreadFunc()
 		{
-			FrameQueue.ReceiveReady += FrameQueueFunc;
-			CommandQueue.ReceiveReady += CommandQueueFunc;
 			ConnectionTimer.Elapsed += ConnectionTimerFunc;
+			CommandQueue.ReceiveReady += CommandQueueFunc;
 			StateSub.ReceiveReady += StateSubFunc;
-			CameraSub.ReceiveReady += CameraSubFunc;
 
 			StateSub.Subscribe("STATE_MOVE_MOTOR");
 			StateSub.Subscribe("STATE_CAMERA_MOTOR");
 			StateSub.Subscribe("STATE_SENSOR");
-			CameraSub.Subscribe("STATE_CAMERA_SENSOR");
+			StateSub.Subscribe("STATE_CAMERA_SENSOR");
 
 			CommandPub.Connect(CONNECTION_STRINGS.PUB);
 			StateSub.Connect(CONNECTION_STRINGS.SUB);
-			CameraSub.Connect(CONNECTION_STRINGS.SUB);
 
-			PbPoller.Add(FrameQueue);
-			MainPoller.Add(CommandQueue);
-			MainPoller.Add(ConnectionTimer);
-			MainPoller.Add(CommandPub);
-			MainPoller.Add(StateSub);
-			MainPoller.Add(CameraSub);
-			PbPoller.RunAsync();
+			MainPoller = new()
+			{
+				ConnectionTimer,
+				CommandQueue,
+				CommandPub,
+				StateSub,
+			};
 			MainPoller.Run();
 
 			CommandPub.Disconnect(CONNECTION_STRINGS.PUB);
 			StateSub.Disconnect(CONNECTION_STRINGS.SUB);
-			CameraSub.Disconnect(CONNECTION_STRINGS.SUB);
 		}
 
-		void FrameQueueFunc(object? s, NetMQQueueEventArgs<Bitmap> e)
-		{
-			try
-			{
-				Bitmap frame = e.Queue.Dequeue();
-				while (e.Queue.Count > 0)
-					frame = e.Queue.Dequeue();
-
-				PB_CameraView.Invoke(new Action(() => { PB_CameraView.Image = frame; }));
-			}
-			catch { }
-		}
-		void CommandQueueFunc(object? s, NetMQQueueEventArgs<NetMQMessage> e)
+		private void CommandQueueFunc(object? s, NetMQQueueEventArgs<NetMQMessage> e)
 		{
 			try
 			{
@@ -74,16 +59,26 @@ namespace AutoDriveControlor.Forms
 
 				CommandPub.SendMultipartMessage(msg);
 			}
-			catch { }
+			finally
+			{
+				GC.Collect();
+			}
 		}
-		void ConnectionTimerFunc(object? s, NetMQTimerEventArgs e)
+		private void ConnectionTimerFunc(object? s, NetMQTimerEventArgs e)
 		{
-			NetMQMessage msg = new NetMQMessage();
-			msg.Append("COMMAND_PICAR", Encoding.ASCII);
-			msg.Append("UPDATE_CONNECTION", Encoding.ASCII);
-			CommandQueue.Enqueue(msg);
+			try
+			{
+				NetMQMessage msg = new NetMQMessage();
+				msg.Append("COMMAND_PICAR", Encoding.ASCII);
+				msg.Append("UPDATE_CONNECTION", Encoding.ASCII);
+				CommandQueue.Enqueue(msg);
+			}
+			finally
+			{
+				GC.Collect();
+			}
 		}
-		void StateSubFunc(object? s, NetMQSocketEventArgs e)
+		private void StateSubFunc(object? s, NetMQSocketEventArgs e)
 		{
 			try
 			{
@@ -92,7 +87,7 @@ namespace AutoDriveControlor.Forms
 				switch (topic)
 				{
 					case "STATE_MOVE_MOTOR":
-						CurrentState.UpdateRearMotorMessage(msg);
+						CurrentState.UpdateMoveMotorMessage(msg);
 						break;
 					case "STATE_CAMERA_MOTOR":
 						CurrentState.UpdateCameraMotorMessage(msg);
@@ -100,36 +95,39 @@ namespace AutoDriveControlor.Forms
 					case "STATE_SENSOR":
 						CurrentState.UpdateSensorMessage(msg);
 						break;
+					case "STATE_CAMERA_SENSOR":
+						CurrentState.UpdateCameraSensorMessage(msg);
+						break;
 				}
 			}
-			catch { }
-		}
-		void CameraSubFunc(object? s, NetMQSocketEventArgs e)
-		{
-			try
+			finally
 			{
-				var msg = e.Socket.ReceiveMultipartMessage();
-
-				string topic = msg[0].ConvertToString(Encoding.ASCII);
-				int w = BitConverter.ToInt32(msg[1].Buffer);
-				int h = BitConverter.ToInt32(msg[2].Buffer);
-				int channel = BitConverter.ToInt32(msg[3].Buffer);
-				byte[] data = msg[4].Buffer;
-
-				var bmp = new Bitmap(w, h, PixelFormat.Format24bppRgb);
-				BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0,
-															bmp.Width,
-															bmp.Height),
-											  ImageLockMode.WriteOnly,
-											  bmp.PixelFormat);
-
-				IntPtr pNative = bmpData.Scan0;
-				Marshal.Copy(data, 0, pNative, data.Length);
-				bmp.UnlockBits(bmpData);
-
-				FrameQueue.Enqueue(bmp);
+				GC.Collect();
 			}
-			catch { }
+		}
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		Task CameraViewTask;
+		bool IsStop = false;
+
+		private void UpdateCameraViewThreaFunc()
+		{
+			while (!IsStop)
+			{
+				TB_FPS.Invoke(delegate ()
+				{
+					TB_FPS.Text = CurrentState.GetFrameRate().ToString();
+				});
+				PB_CameraView.Invoke(delegate ()
+				{
+					Image beforeImage = PB_CameraView.Image;
+					PB_CameraView.Image = CurrentState.GetBitmap();
+					beforeImage?.Dispose();
+				});
+
+				Thread.Sleep(TimeSpan.FromMilliseconds(10));
+			}
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,11 +139,14 @@ namespace AutoDriveControlor.Forms
 		private void AutoDriveControlor_Load(object sender, EventArgs e)
 		{
 			NetMQTask = Task.Run(() => { NetMQThreadFunc(); });
+			CameraViewTask = Task.Run(() => { UpdateCameraViewThreaFunc(); });
 		}
-		private void AutoDriveControlor_FormClosing(object sender, FormClosingEventArgs e)
+		private async void AutoDriveControlor_FormClosing(object sender, FormClosingEventArgs e)
 		{
+			IsStop = true;
 			MainPoller.Stop();
-			NetMQTask.Wait();
+			await NetMQTask;
+			await CameraViewTask;
 		}
 
 		private void BTN_TurnOff_Click(object sender, EventArgs e)
@@ -180,7 +181,7 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_MOVE_MOTOR", Encoding.ASCII);
 			msg.Append("REAR_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.Rear.CurValue + 100));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetRear().CurValue + 100));
 			CommandQueue.Enqueue(msg);
 		}
 		private void BTN_RearBack_Click(object sender, EventArgs e)
@@ -189,7 +190,7 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_MOVE_MOTOR", Encoding.ASCII);
 			msg.Append("REAR_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.Rear.CurValue - 100));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetRear().CurValue - 100));
 			CommandQueue.Enqueue(msg);
 		}
 
@@ -208,7 +209,7 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_MOVE_MOTOR", Encoding.ASCII);
 			msg.Append("STEER_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.Steer.CurValue + 5.0f));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetSteer().CurValue + 5.0f));
 			CommandQueue.Enqueue(msg);
 		}
 		private void BTN_SteerLeft_Click(object sender, EventArgs e)
@@ -217,7 +218,7 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_MOVE_MOTOR", Encoding.ASCII);
 			msg.Append("STEER_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.Steer.CurValue - 5.0f));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetSteer().CurValue - 5.0f));
 			CommandQueue.Enqueue(msg);
 		}
 
@@ -236,7 +237,7 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_CAMERA_MOTOR", Encoding.ASCII);
 			msg.Append("PITCH_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.CameraPitch.CurValue + 10.0f));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraPitch().CurValue + 10.0f));
 			CommandQueue.Enqueue(msg);
 		}
 		private void BTN_PitchDown_Click(object sender, EventArgs e)
@@ -245,7 +246,7 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_CAMERA_MOTOR", Encoding.ASCII);
 			msg.Append("PITCH_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.CameraPitch.CurValue - 10.0f));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraPitch().CurValue - 10.0f));
 			CommandQueue.Enqueue(msg);
 		}
 
@@ -264,7 +265,7 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_CAMERA_MOTOR", Encoding.ASCII);
 			msg.Append("YAW_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.CameraYaw.CurValue + 10.0f));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraYaw().CurValue + 10.0f));
 			CommandQueue.Enqueue(msg);
 		}
 		private void BTN_YawLeft_Click(object sender, EventArgs e)
@@ -273,9 +274,8 @@ namespace AutoDriveControlor.Forms
 			msg.Append("COMMAND_CAMERA_MOTOR", Encoding.ASCII);
 			msg.Append("YAW_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
-			msg.Append(BitConverter.GetBytes(CurrentState.CameraYaw.CurValue - 10.0f));
+			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraYaw().CurValue - 10.0f));
 			CommandQueue.Enqueue(msg);
 		}
-
 	}
 }

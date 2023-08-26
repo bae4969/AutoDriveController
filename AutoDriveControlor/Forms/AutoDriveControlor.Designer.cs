@@ -28,7 +28,6 @@
 		/// </summary>
 		private void InitializeComponent()
 		{
-			PB_CameraView = new PictureBox();
 			BTN_SteerLeft = new Button();
 			BTN_SteerRight = new Button();
 			BTN_RearFront = new Button();
@@ -43,18 +42,10 @@
 			BTN_ResetYaw = new Button();
 			BTN_ResetPitch = new Button();
 			BTN_TurnOff = new Button();
+			TB_FPS = new TextBox();
+			PB_CameraView = new PictureBox();
 			((System.ComponentModel.ISupportInitialize)PB_CameraView).BeginInit();
 			SuspendLayout();
-			// 
-			// PB_CameraView
-			// 
-			PB_CameraView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-			PB_CameraView.Location = new Point(12, 12);
-			PB_CameraView.Name = "PB_CameraView";
-			PB_CameraView.Size = new Size(912, 737);
-			PB_CameraView.SizeMode = PictureBoxSizeMode.Zoom;
-			PB_CameraView.TabIndex = 0;
-			PB_CameraView.TabStop = false;
 			// 
 			// BTN_SteerLeft
 			// 
@@ -221,11 +212,30 @@
 			BTN_TurnOff.UseVisualStyleBackColor = true;
 			BTN_TurnOff.Click += BTN_TurnOff_Click;
 			// 
+			// TB_FPS
+			// 
+			TB_FPS.Location = new Point(983, 128);
+			TB_FPS.Name = "TB_FPS";
+			TB_FPS.Size = new Size(100, 21);
+			TB_FPS.TabIndex = 15;
+			// 
+			// PB_CameraView
+			// 
+			PB_CameraView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+			PB_CameraView.Location = new Point(12, 12);
+			PB_CameraView.Name = "PB_CameraView";
+			PB_CameraView.Size = new Size(912, 737);
+			PB_CameraView.SizeMode = PictureBoxSizeMode.Zoom;
+			PB_CameraView.TabIndex = 16;
+			PB_CameraView.TabStop = false;
+			// 
 			// AutoDriveControlor
 			// 
 			AutoScaleDimensions = new SizeF(7F, 15F);
 			AutoScaleMode = AutoScaleMode.Font;
 			ClientSize = new Size(1184, 761);
+			Controls.Add(PB_CameraView);
+			Controls.Add(TB_FPS);
 			Controls.Add(BTN_TurnOff);
 			Controls.Add(BTN_ResetPitch);
 			Controls.Add(BTN_ResetYaw);
@@ -240,7 +250,7 @@
 			Controls.Add(BTN_RearFront);
 			Controls.Add(BTN_SteerRight);
 			Controls.Add(BTN_SteerLeft);
-			Controls.Add(PB_CameraView);
+			DoubleBuffered = true;
 			Font = new Font("Arial", 9F, FontStyle.Regular, GraphicsUnit.Point);
 			Name = "AutoDriveControlor";
 			Text = "AutoDrive Controlor";
@@ -248,11 +258,10 @@
 			Load += AutoDriveControlor_Load;
 			((System.ComponentModel.ISupportInitialize)PB_CameraView).EndInit();
 			ResumeLayout(false);
+			PerformLayout();
 		}
 
 		#endregion
-
-		public PictureBox PB_CameraView;
 		private Button BTN_SteerLeft;
 		private Button BTN_SteerRight;
 		private Button BTN_RearFront;
@@ -267,5 +276,7 @@
 		private Button BTN_ResetYaw;
 		private Button BTN_ResetPitch;
 		private Button BTN_TurnOff;
+		private TextBox TB_FPS;
+		private PictureBox PB_CameraView;
 	}
 }
