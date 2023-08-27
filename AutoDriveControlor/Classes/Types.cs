@@ -33,17 +33,17 @@ namespace AutoDriveControlor.Classes
 		private object LockCameraObj;
 
 
-		private MotorState<int> Rear;
-		private MotorState<float> Steer;
-		private MotorState<float> CameraPitch;
-		private MotorState<float> CameraYaw;
+		public MotorState<int> Rear;
+		public MotorState<float> Steer;
+		public MotorState<float> CameraPitch;
+		public MotorState<float> CameraYaw;
 
-		private double SonicSensor;
-		private List<int> FloorSensor;
+		public double SonicSensor;
+		public List<int> FloorSensor;
 
 		private Queue<DateTime> LastFrameDt;
-		private int FrameRate;
-		private Bitmap ImageFrame;
+		public int FrameRate;
+		public Bitmap ImageFrame;
 
 		public StateValues()
 		{
@@ -182,26 +182,26 @@ namespace AutoDriveControlor.Classes
 		{
 			try
 			{
-				//var ms = new MemoryStream(msg[1].Buffer);
-				//Bitmap bmp = Bitmap.FromStream(ms);
+				MemoryStream ms = new(msg.Pop().Buffer);
+				Bitmap bmp = (Bitmap)Bitmap.FromStream(ms);
 
-				int w = BitConverter.ToInt32(msg.Pop().Buffer);
-				int h = BitConverter.ToInt32(msg.Pop().Buffer);
-				int channel = BitConverter.ToInt32(msg.Pop().Buffer);
-				byte[] data = msg.Pop().Buffer;
-				if (channel != 3) throw new Exception();
+				//int w = BitConverter.ToInt32(msg.Pop().Buffer);
+				//int h = BitConverter.ToInt32(msg.Pop().Buffer);
+				//int channel = BitConverter.ToInt32(msg.Pop().Buffer);
+				//byte[] data = msg.Pop().Buffer;
+				//if (channel != 3) throw new Exception();
 
-				Rectangle imgRect = new(0, 0, w, h);
-				Bitmap bmp = new(w, h, PixelFormat.Format24bppRgb);
-				BitmapData bmpData = bmp.LockBits(
-					imgRect,
-					ImageLockMode.WriteOnly,
-					bmp.PixelFormat
-				);
+				//Rectangle imgRect = new(0, 0, w, h);
+				//Bitmap bmp = new(w, h, PixelFormat.Format24bppRgb);
+				//BitmapData bmpData = bmp.LockBits(
+				//	imgRect,
+				//	ImageLockMode.WriteOnly,
+				//	bmp.PixelFormat
+				//);
 
-				IntPtr pNative = bmpData.Scan0;
-				Marshal.Copy(data, 0, pNative, data.Length);
-				bmp.UnlockBits(bmpData);
+				//IntPtr pNative = bmpData.Scan0;
+				//Marshal.Copy(data, 0, pNative, data.Length);
+				//bmp.UnlockBits(bmpData);
 
 				lock (LockCameraObj)
 				{
@@ -209,18 +209,12 @@ namespace AutoDriveControlor.Classes
 					ImageFrame = bmp;
 					beforeImage?.Dispose();
 
-					LastFrameDt.Enqueue(DateTime.Now);
-					if (LastFrameDt.Count > 11)
+					DateTime curTime = DateTime.Now;
+					LastFrameDt.Enqueue(curTime);
+					while ((curTime - LastFrameDt.First()).Seconds > 0)
 						LastFrameDt.Dequeue();
 
-					TimeSpan totalSpan = TimeSpan.Zero;
-					for (int i = 0; i + 1 < LastFrameDt.Count; i++)
-						totalSpan += LastFrameDt.ElementAt(i + 1) - LastFrameDt.ElementAt(i);
-
-					FrameRate =
-						totalSpan.Milliseconds != 0 ?
-						10000 / totalSpan.Milliseconds :
-						0;
+					FrameRate = LastFrameDt.Count;
 				}
 				return true;
 			}
@@ -273,10 +267,14 @@ namespace AutoDriveControlor.Classes
 		{
 			lock (LockCameraObj)
 			{
+				DateTime curTime = DateTime.Now;
+				while ((curTime - LastFrameDt.First()).Seconds > 0)
+					LastFrameDt.Dequeue();
+				FrameRate = LastFrameDt.Count;
 				return FrameRate;
 			}
 		}
-		public Bitmap GetBitmap()
+		public Bitmap GetImageFrame()
 		{
 			lock (LockCameraObj)
 			{

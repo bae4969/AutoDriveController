@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AutoDriveControlor": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
