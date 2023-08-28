@@ -124,14 +124,28 @@ namespace AutoDriveControlor.Forms
 		private SolidBrush blueBrush = new(Color.FromArgb(0, 0, 200));
 		private Pen whitePen = new(Color.White, 10);
 
+		private StateValues PbLocalState = new();
+		private Bitmap OriginImage = new(100, 100);
+		private Bitmap FilterImage = new(100, 100);
+
 		private void UpdateCameraViewThreadFunc()
 		{
 			while (!IsStopToUpdateCamera)
 			{
+				DateTime start = DateTime.Now;
+
+				PbLocalState = CurrentState.Clone();
+				OriginImage = PbLocalState.ImageFrame;
+
+				AutoDriveCore.ImageData dllInputData = new(OriginImage);
+				AutoDriveCore.ImageData dllOutputData = AutoDriveCore.ApplyImageFilter(dllInputData);
+				FilterImage = dllOutputData.ToBitmap();
+
 				PB_ViewTL.Invalidate();
 				PB_ViewTR.Invalidate();
 
-				Thread.Sleep(TimeSpan.FromMilliseconds(20));
+				if ((DateTime.Now - start).Milliseconds < 33)
+					Thread.Sleep(TimeSpan.FromMilliseconds(33) - (DateTime.Now - start));
 			}
 		}
 
@@ -179,18 +193,16 @@ namespace AutoDriveControlor.Forms
 		private void PB_ViewTL_Paint(object sender, PaintEventArgs e)
 		{
 			PictureBox targetPB = (PictureBox)sender;
-
-			StateValues t_state = CurrentState.Clone();
-			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, t_state.ImageFrame.Size);
+			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, OriginImage.Size);
 
 			{
-				string frameRateStr = t_state.FrameRate.ToString();
+				string frameRateStr = PbLocalState.FrameRate.ToString();
 				PointF frameRateLoc = new(zommImgRect.Left + 10, zommImgRect.Top + 10);
 				Size textSize = TextRenderer.MeasureText(frameRateStr, viewFontBig);
 				RectangleF frameRateBgRect = new(frameRateLoc, textSize);
 				frameRateBgRect.Width -= 5;
 
-				e.Graphics.DrawImage(t_state.ImageFrame, zommImgRect);
+				e.Graphics.DrawImage(OriginImage, zommImgRect);
 				e.Graphics.FillRectangle(blackBrush, frameRateBgRect);
 				e.Graphics.DrawString(frameRateStr, viewFontBig, whiteBrush, frameRateLoc);
 			}
@@ -200,15 +212,15 @@ namespace AutoDriveControlor.Forms
 				RectangleF speedFGRect = new(zommImgRect.Left + 10, zommImgRect.Bottom - 50, 30, 00);
 
 				e.Graphics.FillRectangle(whiteBrush, speedBGRect);
-				if (t_state.Rear.CurValue >= 0)
+				if (PbLocalState.Rear.CurValue >= 0)
 				{
-					speedFGRect.Height = (float)Math.Abs(t_state.Rear.CurValue * 0.02);
+					speedFGRect.Height = (float)Math.Abs(PbLocalState.Rear.CurValue * 0.02);
 					speedFGRect.Y -= speedFGRect.Height;
 					e.Graphics.FillRectangle(blueBrush, speedFGRect);
 				}
 				else
 				{
-					speedFGRect.Height = (float)Math.Abs(t_state.Rear.CurValue * 0.02);
+					speedFGRect.Height = (float)Math.Abs(PbLocalState.Rear.CurValue * 0.02);
 					e.Graphics.FillRectangle(redBrush, speedFGRect);
 				}
 			}
@@ -217,8 +229,8 @@ namespace AutoDriveControlor.Forms
 				PointF arrowFrom = new(zommImgRect.Left + 80, zommImgRect.Bottom - 20);
 				PointF arrowVec = new(0, -50);
 
-				float t_sin = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(t_state.Steer.CurValue));
-				float t_cos = (float)Math.Cos(MATH.DEGREE_TO_RADIAN(t_state.Steer.CurValue));
+				float t_sin = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(PbLocalState.Steer.CurValue));
+				float t_cos = (float)Math.Cos(MATH.DEGREE_TO_RADIAN(PbLocalState.Steer.CurValue));
 
 				PointF newRotVec = new(
 					arrowVec.X * t_cos - arrowVec.Y * t_sin,
@@ -230,8 +242,8 @@ namespace AutoDriveControlor.Forms
 			}
 
 			{
-				float x_cos = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(t_state.CameraYaw.CurValue)) * 40.0f;
-				float y_cos = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(t_state.CameraPitch.CurValue)) * 40.0f;
+				float x_cos = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(PbLocalState.CameraYaw.CurValue)) * 40.0f;
+				float y_cos = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(PbLocalState.CameraPitch.CurValue)) * 40.0f;
 
 				RectangleF camBgRect = new(zommImgRect.Right - 110, zommImgRect.Bottom - 90, 100, 80);
 				PointF camFgCir = new(zommImgRect.Right - 60 + x_cos, zommImgRect.Bottom - 50 - y_cos);
@@ -242,7 +254,7 @@ namespace AutoDriveControlor.Forms
 			}
 
 			{
-				string distanceStr = (t_state.SonicSensor * 0.001).ToString("0.000m");
+				string distanceStr = (PbLocalState.SonicSensor * 0.001).ToString("0.000m");
 				PointF distanceStrLoc = new(zommImgRect.X + zommImgRect.Width * 0.5f, zommImgRect.Bottom - 60);
 				Size textSize = TextRenderer.MeasureText(distanceStr, viewFontSmall);
 				distanceStrLoc.X -= textSize.Width * 0.5f;
@@ -258,9 +270,9 @@ namespace AutoDriveControlor.Forms
 				PointF centerLoc = new(zommImgRect.X + zommImgRect.Width * 0.5f, zommImgRect.Bottom - 20);
 				PointF rightLoc = new(zommImgRect.X + zommImgRect.Width * 0.5f + 20, zommImgRect.Bottom - 20);
 
-				float multiLeftFloorVal = t_state.FloorSensor[0] / 1000.0f;
-				float multiCenterFloorVal = t_state.FloorSensor[1] / 1000.0f;
-				float multiRightFloorVal = t_state.FloorSensor[2] / 1000.0f;
+				float multiLeftFloorVal = PbLocalState.FloorSensor[0] / 1000.0f;
+				float multiCenterFloorVal = PbLocalState.FloorSensor[1] / 1000.0f;
+				float multiRightFloorVal = PbLocalState.FloorSensor[2] / 1000.0f;
 
 				if (multiLeftFloorVal > 1.0f)
 					multiLeftFloorVal = 1.0f;
@@ -274,9 +286,9 @@ namespace AutoDriveControlor.Forms
 				SolidBrush centerBrush = new(Color.FromArgb((int)(255 * multiCenterFloorVal), redBrush.Color));
 				SolidBrush rightBrush = new(Color.FromArgb((int)(255 * multiRightFloorVal), redBrush.Color));
 
-				RectangleF leftRect = new RectangleF(leftLoc.X - 5, leftLoc.Y - 5, 10, 10);
-				RectangleF centerRect = new RectangleF(centerLoc.X - 5, centerLoc.Y - 5, 10, 10);
-				RectangleF rightRect = new RectangleF(rightLoc.X - 5, rightLoc.Y - 5, 10, 10);
+				RectangleF leftRect = new(leftLoc.X - 5, leftLoc.Y - 5, 10, 10);
+				RectangleF centerRect = new(centerLoc.X - 5, centerLoc.Y - 5, 10, 10);
+				RectangleF rightRect = new(rightLoc.X - 5, rightLoc.Y - 5, 10, 10);
 
 				e.Graphics.FillEllipse(leftBrush, leftRect);
 				e.Graphics.FillEllipse(centerBrush, centerRect);
@@ -286,22 +298,8 @@ namespace AutoDriveControlor.Forms
 		private void PB_ViewTR_Paint(object sender, PaintEventArgs e)
 		{
 			PictureBox targetPB = (PictureBox)sender;
-
-			StateValues t_state = CurrentState.Clone();
-			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, t_state.ImageFrame.Size);
-
-			var img = t_state.ImageFrame;
-			Rectangle rect = new(new Point(0, 0), img.Size);
-			BitmapData imgData = img.LockBits(
-				rect,
-				ImageLockMode.ReadWrite,
-				img.PixelFormat
-			);
-
-			AutoDriveCore.NormalizeRGB(img.Size.Width, img.Size.Height, imgData.Scan0);
-			img.UnlockBits(imgData);
-
-			e.Graphics.DrawImage(img, zommImgRect);
+			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, FilterImage.Size);
+			e.Graphics.DrawImage(FilterImage, zommImgRect);
 		}
 		private void PB_ViewBL_Paint(object sender, PaintEventArgs e)
 		{
@@ -615,18 +613,5 @@ namespace AutoDriveControlor.Forms
 			this.Focus();
 		}
 
-		private void BTN_TSET_Click(object sender, EventArgs e)
-		{
-			var img = CurrentState.GetImageFrame();
-			Rectangle rect = new(new Point(0, 0), img.Size);
-			BitmapData imgData = img.LockBits(
-				rect,
-				ImageLockMode.ReadOnly,
-				img.PixelFormat
-			);
-
-			IntPtr dataPtr = imgData.Scan0;
-			AutoDriveCore.TEST(img.Size.Width, img.Size.Height, dataPtr);
-		}
 	}
 }

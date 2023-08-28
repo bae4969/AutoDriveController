@@ -1,9 +1,9 @@
 ﻿#pragma once
 #include "Defs.h"
+#include "Types.h"
 
 namespace AutoDriveCode {
-	AUTODRIVECORE_EXPORT int NormalizeRGB(int w, int h, void* data);
-	AUTODRIVECORE_EXPORT int TEST(int w, int h, void* data);
+	AUTODRIVECORE_EXPORT ImageData ApplyImageFilter(ImageData in_img);
 }
 
 

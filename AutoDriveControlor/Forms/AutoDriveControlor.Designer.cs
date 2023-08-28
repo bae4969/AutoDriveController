@@ -147,7 +147,6 @@
 			BTN_TSET.TabIndex = 0;
 			BTN_TSET.Text = "test";
 			BTN_TSET.UseVisualStyleBackColor = true;
-			BTN_TSET.Click += BTN_TSET_Click;
 			// 
 			// AutoDriveControlor
 			// 
