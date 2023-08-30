@@ -9,13 +9,14 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace AutoDriveControlor.Imports
 {
-	internal static class AutoDriveCore
+	internal static class Core
 	{
 #if DEBUG
 		private const string DLL_FILE_NAME = "AutoDriveCore_d.dll";
 #else
 		private const string DLL_FILE_NAME = "AutoDriveCore.dll";
 #endif
+
 
 		[StructLayout(LayoutKind.Sequential)]
 		public struct ImageData
@@ -26,52 +27,7 @@ namespace AutoDriveControlor.Imports
 			[MarshalAs(UnmanagedType.I4)] int Step;
 			IntPtr Data;
 
-			public ImageData()
-			{
-				W = 0;
-				H = 0;
-				Ch = 0;
-				Step = 0;
-				Data = IntPtr.Zero;
-			}
-			public unsafe ImageData(Bitmap bitmap)
-			{
-				W = bitmap.Width;
-				H = bitmap.Height;
-				switch (bitmap.PixelFormat)
-				{
-					case PixelFormat.Format8bppIndexed:
-						Ch = 1;
-						Step = 1;
-						break;
-					case PixelFormat.Format16bppGrayScale:
-						Ch = 1;
-						Step = 2;
-						break;
-					case PixelFormat.Format24bppRgb:
-						Ch = 3;
-						Step = 1;
-						break;
-					case PixelFormat.Format32bppArgb:
-						Ch = 4;
-						Step = 1;
-						break;
-					default: throw new Exception();
-				}
-
-				int totMemSize = W * H * Ch * Step;
-				Data = Marshal.AllocHGlobal(totMemSize);
-
-				Rectangle rect = new(0, 0, W, H);
-				BitmapData imgData = bitmap.LockBits(
-					rect,
-					ImageLockMode.ReadOnly,
-					bitmap.PixelFormat
-				);
-				Buffer.MemoryCopy((void*)imgData.Scan0, (void*)Data, totMemSize, totMemSize);
-				bitmap.UnlockBits(imgData);
-			}
-			public unsafe Bitmap ToBitmap()
+			public unsafe Bitmap? ToBitmap()
 			{
 				PixelFormat format;
 				if (Ch == 1 && Step == 1)
@@ -83,7 +39,7 @@ namespace AutoDriveControlor.Imports
 				else if (Ch == 4 && Step == 1)
 					format = PixelFormat.Format32bppArgb;
 				else
-					throw new Exception();
+					return null;
 
 				Bitmap bitmap = new(W, H, format);
 				Rectangle rect = new(0, 0, W, H);
@@ -101,7 +57,15 @@ namespace AutoDriveControlor.Imports
 			}
 		}
 
+
 		[DllImport(DLL_FILE_NAME)]
-		public static extern ImageData ApplyImageFilter(ImageData img);
+		public static extern void Init([MarshalAs(UnmanagedType.LPStr)] string pubAddress, [MarshalAs(UnmanagedType.LPStr)] string subAddress);
+		[DllImport(DLL_FILE_NAME)]
+		public static extern void Release();
+
+		[DllImport(DLL_FILE_NAME)]
+		public static extern ImageData GetOriginImage();
+		[DllImport(DLL_FILE_NAME)]
+		public static extern ImageData GetFilterImage();
 	}
 }

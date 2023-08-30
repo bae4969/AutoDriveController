@@ -30,8 +30,6 @@ namespace AutoDriveControlor.Classes
 		private object LockMoveMotorObj;
 		private object LockCameraMotorObj;
 		private object LockSensorObj;
-		private object LockCameraObj;
-
 
 		public MotorState<int> Rear;
 		public MotorState<float> Steer;
@@ -41,16 +39,12 @@ namespace AutoDriveControlor.Classes
 		public double SonicSensor;
 		public List<int> FloorSensor;
 
-		private Queue<DateTime> LastFrameDt;
-		public int FrameRate;
-		public Bitmap ImageFrame;
 
 		public StateValues()
 		{
 			LockMoveMotorObj = new();
 			LockCameraMotorObj = new();
 			LockSensorObj = new();
-			LockCameraObj = new();
 
 			Rear = new();
 			Steer = new();
@@ -64,10 +58,6 @@ namespace AutoDriveControlor.Classes
 				0,
 				0
 			};
-
-			LastFrameDt = new();
-			FrameRate = 0;
-			ImageFrame = new Bitmap(100, 100, PixelFormat.Format24bppRgb);
 		}
 		public StateValues Clone()
 		{
@@ -76,7 +66,6 @@ namespace AutoDriveControlor.Classes
 				LockMoveMotorObj = new(),
 				LockCameraMotorObj = new(),
 				LockSensorObj = new(),
-				LockCameraObj = new(),
 			};
 
 			lock (LockMoveMotorObj)
@@ -95,13 +84,6 @@ namespace AutoDriveControlor.Classes
 			{
 				ret.SonicSensor = SonicSensor;
 				ret.FloorSensor = FloorSensor;
-			}
-
-			lock (LockCameraObj)
-			{
-				ret.LastFrameDt = LastFrameDt;
-				ret.FrameRate = FrameRate;
-				ret.ImageFrame = (Bitmap)ImageFrame.Clone();
 			}
 
 			return ret;
@@ -178,48 +160,6 @@ namespace AutoDriveControlor.Classes
 			}
 			catch { return false; }
 		}
-		public bool UpdateCameraSensorMessage(NetMQMessage msg)
-		{
-			try
-			{
-				MemoryStream ms = new(msg.Pop().Buffer);
-				Bitmap bmp = (Bitmap)Bitmap.FromStream(ms);
-
-				//int w = BitConverter.ToInt32(msg.Pop().Buffer);
-				//int h = BitConverter.ToInt32(msg.Pop().Buffer);
-				//int channel = BitConverter.ToInt32(msg.Pop().Buffer);
-				//byte[] data = msg.Pop().Buffer;
-				//if (channel != 3) throw new Exception();
-
-				//Rectangle imgRect = new(0, 0, w, h);
-				//Bitmap bmp = new(w, h, PixelFormat.Format24bppRgb);
-				//BitmapData bmpData = bmp.LockBits(
-				//	imgRect,
-				//	ImageLockMode.WriteOnly,
-				//	bmp.PixelFormat
-				//);
-
-				//IntPtr pNative = bmpData.Scan0;
-				//Marshal.Copy(data, 0, pNative, data.Length);
-				//bmp.UnlockBits(bmpData);
-
-				lock (LockCameraObj)
-				{
-					Image beforeImage = ImageFrame;
-					ImageFrame = bmp;
-					beforeImage?.Dispose();
-
-					DateTime curTime = DateTime.Now;
-					LastFrameDt.Enqueue(curTime);
-					while ((curTime - LastFrameDt.First()).Seconds > 0)
-						LastFrameDt.Dequeue();
-
-					FrameRate = LastFrameDt.Count;
-				}
-				return true;
-			}
-			catch { return false; }
-		}
 
 		public MotorState<int> GetRear()
 		{
@@ -261,24 +201,6 @@ namespace AutoDriveControlor.Classes
 			lock (LockSensorObj)
 			{
 				return FloorSensor;
-			}
-		}
-		public int GetFrameRate()
-		{
-			lock (LockCameraObj)
-			{
-				DateTime curTime = DateTime.Now;
-				while ((curTime - LastFrameDt.First()).Seconds > 0)
-					LastFrameDt.Dequeue();
-				FrameRate = LastFrameDt.Count;
-				return FrameRate;
-			}
-		}
-		public Bitmap GetImageFrame()
-		{
-			lock (LockCameraObj)
-			{
-				return (Bitmap)ImageFrame.Clone();
 			}
 		}
 	}

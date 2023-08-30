@@ -12,30 +12,27 @@ namespace AutoDriveCode {
 		Step = 0;
 		Data = NULL;
 	}
-	ImageData::ImageData(Mat mat) {
-		W = mat.cols;
-		H = mat.rows;
-		Ch = mat.elemSize();
-		Step = mat.elemSize1();
+	ImageData ImageData::Clone() {
+		ImageData ret;
 
-		size_t totMemSize = W * H * Ch * Step;
-		Data = new char[totMemSize];
-		memcpy(Data, mat.data, totMemSize);
-	}
-	Mat ImageData::ToMat() {
-		int depth;
-		switch (Step) {
-		case 1: depth = CV_8U; break;
-		case 2: depth = CV_16U; break;
-		case 4: depth = CV_32F; break;
-		case 8: depth = CV_64F; break;
-		default: return Mat();
+		ret.W = this->W;
+		ret.H = this->H;
+		ret.Ch = this->Ch;
+		ret.Step = this->Step;
+
+		size_t totMemSize = ret.W * ret.H * ret.Ch * ret.Step;
+		if (totMemSize == 0)
+			ret.Data = NULL;
+		else {
+			ret.Data = new char[totMemSize];
+			memcpy(Data, this->Data, totMemSize);
 		}
 
-		int type = CV_MAKETYPE(depth, Ch);
-		return Mat(H, W, type, Data);
+		return ret;
 	}
 	void ImageData::Update(Mat mat) {
+		if (mat.empty()) return;
+
 		if (W == mat.cols &&
 			H == mat.rows &&
 			Ch == mat.elemSize() &&
@@ -62,6 +59,61 @@ namespace AutoDriveCode {
 			delete[] Data;
 			Data = NULL;
 		}
+	}
+
+	void StateType::Clone(StateType& state) {
+		syncMutex.lock();
+		state.Rear = Rear;
+		state.Steer = Steer;
+		state.CameraPitch = CameraPitch;
+		state.CameraYaw = CameraYaw;
+		state.SonicSensor = SonicSensor;
+		state.FloorSensor = FloorSensor;
+		state.FrameDateTime = FrameDateTime;
+		state.OriginImage = OriginImage.clone();
+		state.FilterImage = FilterImage.clone();
+		syncMutex.unlock();
+	}
+	void StateType::UpdateMoveMotorState(MotorStateType<int>& rear, MotorStateType<float>& steer) {
+		syncMutex.lock();
+		Rear = rear;
+		Steer = steer;
+		syncMutex.unlock();
+	}
+	void StateType::UpdateCameraMotorState(MotorStateType<float>& cameraPitch, MotorStateType<float>& cameraYaw) {
+		syncMutex.lock();
+		CameraPitch = cameraPitch;
+		CameraYaw = cameraYaw;
+		syncMutex.unlock();
+	}
+	void StateType::UpdateSensorState(double& sonicSensor, std::vector<int>& floorSensor) {
+		syncMutex.lock();
+		SonicSensor = sonicSensor;
+		FloorSensor = floorSensor;
+		syncMutex.unlock();
+	}
+	void StateType::UpdateCameraImage(Mat& originImage, Mat& filterImage) {
+		auto now = chrono::steady_clock::now();
+		syncMutex.lock();
+		FrameDateTime.push(now);
+		while ((now - FrameDateTime.front()) > chrono::seconds(1))
+			FrameDateTime.pop();
+		OriginImage = originImage;
+		FilterImage = filterImage;
+		syncMutex.unlock();
+	}
+
+	Mat StateType::GetOriginImage() {
+		syncMutex.lock();
+		Mat ret = OriginImage.clone();
+		syncMutex.unlock();
+		return ret;
+	}
+	Mat StateType::GetFilterImage() {
+		syncMutex.lock();
+		Mat ret = FilterImage.clone();
+		syncMutex.unlock();
+		return ret;
 	}
 }
 

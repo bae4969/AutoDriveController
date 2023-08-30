@@ -8,11 +8,14 @@ namespace AutoDriveControlor.Classes
 {
 	public static class CONNECTION_STRINGS
 	{
-		//public const string PUB = "tcp://192.168.211.200:45001";
-		//public const string SUB = "tcp://192.168.211.200:45000";
+		//public const string XPUB = "tcp://192.168.211.200:45001";
+		//public const string XSUB = "tcp://192.168.211.200:45000";
 
-		public const string PUB = "tcp://192.168.0.150:45001";
-		public const string SUB = "tcp://192.168.0.150:45000";
+		public const string EXTERN_PUB = "tcp://192.168.0.150:45001";
+		public const string EXTERN_SUB = "tcp://192.168.0.150:45000";
+
+		public const string LOCAL_PUB = "ipc://temp/LOCAL_PUB";
+		public const string LOCAL_SUB = "ipc://temp/LOCAL_SUB";
 	}
 
 	public static class PB_CAL

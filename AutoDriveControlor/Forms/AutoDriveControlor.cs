@@ -17,10 +17,12 @@ namespace AutoDriveControlor.Forms
 {
 	public partial class AutoDriveControlor : Form
 	{
-		private Task NetMQTask;
-		private NetMQPoller MainPoller = new();
+		private Task? NetMQTask = null;
+		private Proxy? NetMQProxy = null;
 		private NetMQTimer ConnectionTimer = new(TimeSpan.FromSeconds(1));
-		private NetMQQueue<NetMQMessage> CommandQueue = new();
+		private NetMQQueue<KeyValuePair<bool, NetMQMessage>> CommandQueue = new();
+		private XPublisherSocket xPub = new();
+		private XSubscriberSocket xSub = new();
 		private PublisherSocket CommandPub = new();
 		private SubscriberSocket StateSub = new();
 
@@ -28,6 +30,19 @@ namespace AutoDriveControlor.Forms
 
 		private void NetMQThreadFunc()
 		{
+			if (!Directory.Exists("./temp"))
+				Directory.CreateDirectory("./temp");
+
+			xPub.Options.SendHighWatermark = 20;
+			xSub.Options.ReceiveHighWatermark = 20;
+			CommandPub.Options.SendHighWatermark = 20;
+			StateSub.Options.ReceiveHighWatermark = 20;
+
+			xSub.Connect(CONNECTION_STRINGS.EXTERN_PUB);
+			xPub.Bind(CONNECTION_STRINGS.LOCAL_PUB);
+			CommandPub.Connect(CONNECTION_STRINGS.EXTERN_SUB);
+			StateSub.Connect(CONNECTION_STRINGS.LOCAL_PUB);
+
 			ConnectionTimer.Elapsed += ConnectionTimerFunc;
 			CommandQueue.ReceiveReady += CommandQueueFunc;
 			StateSub.ReceiveReady += StateSubFunc;
@@ -35,33 +50,35 @@ namespace AutoDriveControlor.Forms
 			StateSub.Subscribe("STATE_MOVE_MOTOR");
 			StateSub.Subscribe("STATE_CAMERA_MOTOR");
 			StateSub.Subscribe("STATE_SENSOR");
-			StateSub.Subscribe("STATE_CAMERA_SENSOR");
 
-			CommandPub.Connect(CONNECTION_STRINGS.PUB);
-			StateSub.Connect(CONNECTION_STRINGS.SUB);
+			NetMQProxy = new(xSub, xPub);
+			NetMQPoller LocalPoller = new()
+				{
+					ConnectionTimer,
+					CommandQueue,
+					CommandPub,
+					StateSub,
+				};
 
-			MainPoller = new()
-			{
-				ConnectionTimer,
-				CommandQueue,
-				CommandPub,
-				StateSub,
-			};
-			MainPoller.Run();
+			LocalPoller.RunAsync();
+			NetMQProxy.Start();
+			LocalPoller.Stop();
 
-			CommandPub.Disconnect(CONNECTION_STRINGS.PUB);
-			StateSub.Disconnect(CONNECTION_STRINGS.SUB);
+			CommandPub.Disconnect(CONNECTION_STRINGS.EXTERN_SUB);
+			StateSub.Disconnect(CONNECTION_STRINGS.LOCAL_PUB);
+			xSub.Disconnect(CONNECTION_STRINGS.EXTERN_PUB);
+			xPub.Unbind(CONNECTION_STRINGS.LOCAL_PUB);
 		}
 
-		private void CommandQueueFunc(object? s, NetMQQueueEventArgs<NetMQMessage> e)
+		private void CommandQueueFunc(object? s, NetMQQueueEventArgs<KeyValuePair<bool, NetMQMessage>> e)
 		{
 			try
 			{
-				NetMQMessage msg = e.Queue.Dequeue();
-				while (e.Queue.Count > 5)
-					msg = e.Queue.Dequeue();
+				KeyValuePair<bool, NetMQMessage> val = e.Queue.Dequeue();
+				while (!val.Key && e.Queue.Count > 5)
+					val = e.Queue.Dequeue();
 
-				CommandPub.SendMultipartMessage(msg);
+				CommandPub.SendMultipartMessage(val.Value);
 			}
 			finally
 			{
@@ -75,7 +92,9 @@ namespace AutoDriveControlor.Forms
 				NetMQMessage msg = new NetMQMessage();
 				msg.Append("COMMAND_PICAR", Encoding.ASCII);
 				msg.Append("UPDATE_CONNECTION", Encoding.ASCII);
-				CommandQueue.Enqueue(msg);
+
+				KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+				CommandQueue.Enqueue(val);
 			}
 			finally
 			{
@@ -99,9 +118,6 @@ namespace AutoDriveControlor.Forms
 					case "STATE_SENSOR":
 						CurrentState.UpdateSensorMessage(msg);
 						break;
-					case "STATE_CAMERA_SENSOR":
-						CurrentState.UpdateCameraSensorMessage(msg);
-						break;
 				}
 			}
 			finally
@@ -113,20 +129,10 @@ namespace AutoDriveControlor.Forms
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		private bool IsStopToUpdateCamera = false;
-		private Task CameraViewTask;
-		private PictureBox ZoomInPb = null;
-		private Font viewFontBig = new("Arial", 20, FontStyle.Bold);
-		private Font viewFontSmall = new("Arial", 16, FontStyle.Bold);
-		private SolidBrush blackBrush = new(Color.FromArgb(150, 0, 0, 0));
-		private SolidBrush whiteBrush = new(Color.FromArgb(255, 255, 255, 255));
-		private SolidBrush redBrush = new(Color.FromArgb(200, 0, 0));
-		private SolidBrush greenBrush = new(Color.FromArgb(0, 200, 0));
-		private SolidBrush blueBrush = new(Color.FromArgb(0, 0, 200));
-		private Pen whitePen = new(Color.White, 10);
-
-		private StateValues PbLocalState = new();
-		private Bitmap OriginImage = new(100, 100);
-		private Bitmap FilterImage = new(100, 100);
+		private Task? CameraViewTask = null;
+		private PictureBox? ZoomInPb = null;
+		private Bitmap? OriginImage = new(100, 100);
+		private Bitmap? FilterImage = new(100, 100);
 
 		private void UpdateCameraViewThreadFunc()
 		{
@@ -134,13 +140,10 @@ namespace AutoDriveControlor.Forms
 			{
 				DateTime start = DateTime.Now;
 
-				PbLocalState = CurrentState.Clone();
-				OriginImage = PbLocalState.ImageFrame;
-
-				AutoDriveCore.ImageData dllInputData = new(OriginImage);
-				AutoDriveCore.ImageData dllOutputData = AutoDriveCore.ApplyImageFilter(dllInputData);
-				FilterImage = dllOutputData.ToBitmap();
-
+				Core.ImageData? originData = Core.GetOriginImage();
+				Core.ImageData? filterData = Core.GetFilterImage();
+				OriginImage = originData?.ToBitmap();
+				FilterImage = filterData?.ToBitmap();
 				PB_ViewTL.Invalidate();
 				PB_ViewTR.Invalidate();
 
@@ -192,111 +195,16 @@ namespace AutoDriveControlor.Forms
 		}
 		private void PB_ViewTL_Paint(object sender, PaintEventArgs e)
 		{
+			if (OriginImage == null) return;
+
 			PictureBox targetPB = (PictureBox)sender;
 			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, OriginImage.Size);
-
-			{
-				string frameRateStr = PbLocalState.FrameRate.ToString();
-				PointF frameRateLoc = new(zommImgRect.Left + 10, zommImgRect.Top + 10);
-				Size textSize = TextRenderer.MeasureText(frameRateStr, viewFontBig);
-				RectangleF frameRateBgRect = new(frameRateLoc, textSize);
-				frameRateBgRect.Width -= 5;
-
-				e.Graphics.DrawImage(OriginImage, zommImgRect);
-				e.Graphics.FillRectangle(blackBrush, frameRateBgRect);
-				e.Graphics.DrawString(frameRateStr, viewFontBig, whiteBrush, frameRateLoc);
-			}
-
-			{
-				RectangleF speedBGRect = new(zommImgRect.Left + 10, zommImgRect.Bottom - 90, 30, 80);
-				RectangleF speedFGRect = new(zommImgRect.Left + 10, zommImgRect.Bottom - 50, 30, 00);
-
-				e.Graphics.FillRectangle(whiteBrush, speedBGRect);
-				if (PbLocalState.Rear.CurValue >= 0)
-				{
-					speedFGRect.Height = (float)Math.Abs(PbLocalState.Rear.CurValue * 0.02);
-					speedFGRect.Y -= speedFGRect.Height;
-					e.Graphics.FillRectangle(blueBrush, speedFGRect);
-				}
-				else
-				{
-					speedFGRect.Height = (float)Math.Abs(PbLocalState.Rear.CurValue * 0.02);
-					e.Graphics.FillRectangle(redBrush, speedFGRect);
-				}
-			}
-
-			{
-				PointF arrowFrom = new(zommImgRect.Left + 80, zommImgRect.Bottom - 20);
-				PointF arrowVec = new(0, -50);
-
-				float t_sin = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(PbLocalState.Steer.CurValue));
-				float t_cos = (float)Math.Cos(MATH.DEGREE_TO_RADIAN(PbLocalState.Steer.CurValue));
-
-				PointF newRotVec = new(
-					arrowVec.X * t_cos - arrowVec.Y * t_sin,
-					arrowVec.X * t_sin + arrowVec.Y * t_cos
-				);
-				PointF arrowTo = new(arrowFrom.X + newRotVec.X, arrowFrom.Y + newRotVec.Y);
-
-				e.Graphics.DrawLine(whitePen, arrowFrom, arrowTo);
-			}
-
-			{
-				float x_cos = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(PbLocalState.CameraYaw.CurValue)) * 40.0f;
-				float y_cos = (float)Math.Sin(MATH.DEGREE_TO_RADIAN(PbLocalState.CameraPitch.CurValue)) * 40.0f;
-
-				RectangleF camBgRect = new(zommImgRect.Right - 110, zommImgRect.Bottom - 90, 100, 80);
-				PointF camFgCir = new(zommImgRect.Right - 60 + x_cos, zommImgRect.Bottom - 50 - y_cos);
-				RectangleF camFgRect = new(camFgCir.X - 5, camFgCir.Y - 5, 10, 10);
-
-				e.Graphics.FillRectangle(whiteBrush, camBgRect);
-				e.Graphics.FillEllipse(redBrush, camFgRect);
-			}
-
-			{
-				string distanceStr = (PbLocalState.SonicSensor * 0.001).ToString("0.000m");
-				PointF distanceStrLoc = new(zommImgRect.X + zommImgRect.Width * 0.5f, zommImgRect.Bottom - 60);
-				Size textSize = TextRenderer.MeasureText(distanceStr, viewFontSmall);
-				distanceStrLoc.X -= textSize.Width * 0.5f;
-				RectangleF distanceBgRect = new(distanceStrLoc, textSize);
-				distanceBgRect.Width -= 5;
-
-				e.Graphics.FillRectangle(blackBrush, distanceBgRect);
-				e.Graphics.DrawString(distanceStr, viewFontSmall, whiteBrush, distanceStrLoc);
-			}
-
-			{
-				PointF leftLoc = new(zommImgRect.X + zommImgRect.Width * 0.5f - 20, zommImgRect.Bottom - 20);
-				PointF centerLoc = new(zommImgRect.X + zommImgRect.Width * 0.5f, zommImgRect.Bottom - 20);
-				PointF rightLoc = new(zommImgRect.X + zommImgRect.Width * 0.5f + 20, zommImgRect.Bottom - 20);
-
-				float multiLeftFloorVal = PbLocalState.FloorSensor[0] / 1000.0f;
-				float multiCenterFloorVal = PbLocalState.FloorSensor[1] / 1000.0f;
-				float multiRightFloorVal = PbLocalState.FloorSensor[2] / 1000.0f;
-
-				if (multiLeftFloorVal > 1.0f)
-					multiLeftFloorVal = 1.0f;
-				if (multiCenterFloorVal > 1.0f)
-					multiCenterFloorVal = 1.0f;
-				if (multiRightFloorVal > 1.0f)
-					multiRightFloorVal = 1.0f;
-
-
-				SolidBrush leftBrush = new(Color.FromArgb((int)(255 * multiLeftFloorVal), redBrush.Color));
-				SolidBrush centerBrush = new(Color.FromArgb((int)(255 * multiCenterFloorVal), redBrush.Color));
-				SolidBrush rightBrush = new(Color.FromArgb((int)(255 * multiRightFloorVal), redBrush.Color));
-
-				RectangleF leftRect = new(leftLoc.X - 5, leftLoc.Y - 5, 10, 10);
-				RectangleF centerRect = new(centerLoc.X - 5, centerLoc.Y - 5, 10, 10);
-				RectangleF rightRect = new(rightLoc.X - 5, rightLoc.Y - 5, 10, 10);
-
-				e.Graphics.FillEllipse(leftBrush, leftRect);
-				e.Graphics.FillEllipse(centerBrush, centerRect);
-				e.Graphics.FillEllipse(rightBrush, rightRect);
-			}
+			e.Graphics.DrawImage(OriginImage, zommImgRect);
 		}
 		private void PB_ViewTR_Paint(object sender, PaintEventArgs e)
 		{
+			if (FilterImage == null) return;
+
 			PictureBox targetPB = (PictureBox)sender;
 			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, FilterImage.Size);
 			e.Graphics.DrawImage(FilterImage, zommImgRect);
@@ -313,7 +221,7 @@ namespace AutoDriveControlor.Forms
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		private bool IsStopToUpdateCommand = false;
-		private Task CommandTask;
+		private Task? CommandTask = null;
 		private Action? SpecialFunc = null;
 		private Action? RearFunc = null;
 		private Action? SteerFunc = null;
@@ -463,7 +371,9 @@ namespace AutoDriveControlor.Forms
 			//NetMQMessage msg = new NetMQMessage();
 			//msg.Append("COMMAND_PICAR", Encoding.ASCII);
 			//msg.Append("TURN_OFF", Encoding.ASCII);
-			//CommandQueue.Enqueue(msg);
+
+			//KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			//CommandQueue.Enqueue(val);
 		}
 		private void CommandStopNow()
 		{
@@ -472,7 +382,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("REAR_MOTOR", Encoding.ASCII);
 			msg.Append("STOP", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(0));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 
 		private void CommandRearReset()
@@ -482,7 +394,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("REAR_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(0));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandRearFront()
 		{
@@ -491,7 +405,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("REAR_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetRear().CurValue + 100));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandRearBack()
 		{
@@ -500,7 +416,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("REAR_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetRear().CurValue - 100));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 
 		private void CommandSteerReset()
@@ -510,7 +428,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("STEER_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(0.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandSteerRight()
 		{
@@ -519,7 +439,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("STEER_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetSteer().CurValue + 5.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandSteerLeft()
 		{
@@ -528,7 +450,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("STEER_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetSteer().CurValue - 5.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 
 		private void CommandPitchReset()
@@ -538,7 +462,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("PITCH_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(0.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandPitchUp()
 		{
@@ -547,7 +473,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("PITCH_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraPitch().CurValue + 10.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandPitchDown()
 		{
@@ -556,7 +484,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("PITCH_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraPitch().CurValue - 10.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 
 		private void CommandYawReset()
@@ -566,7 +496,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("YAW_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(0.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandYawRight()
 		{
@@ -575,7 +507,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("YAW_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraYaw().CurValue + 10.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 		private void CommandYawLeft()
 		{
@@ -584,7 +518,9 @@ namespace AutoDriveControlor.Forms
 			msg.Append("YAW_MOTOR", Encoding.ASCII);
 			msg.Append("VALUE", Encoding.ASCII);
 			msg.Append(BitConverter.GetBytes(CurrentState.GetCameraYaw().CurValue - 10.0f));
-			CommandQueue.Enqueue(msg);
+
+			KeyValuePair<bool, NetMQMessage> val = new(true, msg);
+			CommandQueue.Enqueue(val);
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -595,13 +531,15 @@ namespace AutoDriveControlor.Forms
 		}
 		private void AutoDriveControlor_Load(object sender, EventArgs e)
 		{
+			Core.Init(CONNECTION_STRINGS.EXTERN_SUB, CONNECTION_STRINGS.LOCAL_PUB);
 			NetMQTask = Task.Run(() => { NetMQThreadFunc(); });
 			CameraViewTask = Task.Run(() => { UpdateCameraViewThreadFunc(); });
 			CommandTask = Task.Run(() => { UpdateCommandThreadFunc(); });
 		}
 		private async void AutoDriveControlor_FormClosing(object sender, FormClosingEventArgs e)
 		{
-			MainPoller.Stop();
+			Core.Release();
+			NetMQProxy?.Stop();
 			IsStopToUpdateCamera = true;
 			IsStopToUpdateCommand = true;
 			await NetMQTask;
@@ -612,6 +550,5 @@ namespace AutoDriveControlor.Forms
 		{
 			this.Focus();
 		}
-
 	}
 }

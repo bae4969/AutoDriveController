@@ -11,12 +11,42 @@ namespace AutoDriveCode {
 		void* Data;
 
 		ImageData();
-		ImageData(cv::Mat mat);
-		cv::Mat ToMat();
+		ImageData Clone();
 		void Update(cv::Mat mat);
 		void Release();
 	};
 
+	template<typename TYPE>
+	struct MotorStateType {
+		TYPE CurValue;
+		TYPE TarValue;
+		TYPE Speed;
+	};
+	struct StateType {
+		std::mutex syncMutex;
+
+		MotorStateType<int> Rear;
+		MotorStateType<float> Steer;
+		MotorStateType<float> CameraPitch;
+		MotorStateType<float> CameraYaw;
+
+		double SonicSensor = 0.0;
+		std::vector<int> FloorSensor = std::vector<int>(3, 0);
+
+		std::queue<std::chrono::steady_clock::time_point> FrameDateTime;
+		cv::Mat OriginImage;
+		cv::Mat FilterImage;
+
+
+		void Clone(StateType& state);
+		void UpdateMoveMotorState(MotorStateType<int>& rear, MotorStateType<float>& steer);
+		void UpdateCameraMotorState(MotorStateType<float>& cameraPitch, MotorStateType<float>& cameraYaw);
+		void UpdateSensorState(double& sonicSensor, std::vector<int>& floorSensor);
+		void UpdateCameraImage(cv::Mat& originImage, cv::Mat& filterImage);
+
+		cv::Mat GetOriginImage();
+		cv::Mat GetFilterImage();
+	};
 }
 
 
