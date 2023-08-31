@@ -3,6 +3,7 @@
 
 namespace AutoDriveCode {
 	namespace ImageFilter {
-		cv::Mat ApplyFilter(cv::Mat& src);
+		cv::Mat ApplyStateInfo(cv::Mat& src, StateType& stateInfo);
+		cv::Mat ApplyAdaptiveBrightness(cv::Mat& src);
 	}
 }

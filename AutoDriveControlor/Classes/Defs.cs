@@ -13,9 +13,6 @@ namespace AutoDriveControlor.Classes
 
 		public const string EXTERN_PUB = "tcp://192.168.0.150:45001";
 		public const string EXTERN_SUB = "tcp://192.168.0.150:45000";
-
-		public const string LOCAL_PUB = "ipc://temp/LOCAL_PUB";
-		public const string LOCAL_SUB = "ipc://temp/LOCAL_SUB";
 	}
 
 	public static class PB_CAL

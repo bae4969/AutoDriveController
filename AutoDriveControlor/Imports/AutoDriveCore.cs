@@ -58,14 +58,18 @@ namespace AutoDriveControlor.Imports
 		}
 
 
-		[DllImport(DLL_FILE_NAME)]
-		public static extern void Init([MarshalAs(UnmanagedType.LPStr)] string pubAddress, [MarshalAs(UnmanagedType.LPStr)] string subAddress);
-		[DllImport(DLL_FILE_NAME)]
-		public static extern void Release();
+		[DllImport(DLL_FILE_NAME)] public static extern void Init([MarshalAs(UnmanagedType.LPStr)] string pubAddress, [MarshalAs(UnmanagedType.LPStr)] string subAddress);
+		[DllImport(DLL_FILE_NAME)] public static extern void Release();
 
-		[DllImport(DLL_FILE_NAME)]
-		public static extern ImageData GetOriginImage();
-		[DllImport(DLL_FILE_NAME)]
-		public static extern ImageData GetFilterImage();
+		[DllImport(DLL_FILE_NAME)] public static extern ImageData GetOriginImage();
+		[DllImport(DLL_FILE_NAME)] public static extern ImageData GetStateImage();
+		[DllImport(DLL_FILE_NAME)] public static extern ImageData GetFilterImage();
+
+		[DllImport(DLL_FILE_NAME)] public static extern void TurnOff();
+		[DllImport(DLL_FILE_NAME)] public static extern void StopMove();
+		[DllImport(DLL_FILE_NAME)] public static extern void ChangeRearValue(int diff);
+		[DllImport(DLL_FILE_NAME)] public static extern void ChangeSteerValue(float diff);
+		[DllImport(DLL_FILE_NAME)] public static extern void ChangeCameraPitchValue(float diff);
+		[DllImport(DLL_FILE_NAME)] public static extern void ChangeCameraPitchYaw(float diff);
 	}
 }

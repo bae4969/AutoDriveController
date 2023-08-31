@@ -92,13 +92,14 @@ namespace AutoDriveCode {
 		FloorSensor = floorSensor;
 		syncMutex.unlock();
 	}
-	void StateType::UpdateCameraImage(Mat& originImage, Mat& filterImage) {
+	void StateType::UpdateCameraImage(Mat& originImage, Mat& stateImage, Mat& filterImage) {
 		auto now = chrono::steady_clock::now();
 		syncMutex.lock();
 		FrameDateTime.push(now);
 		while ((now - FrameDateTime.front()) > chrono::seconds(1))
 			FrameDateTime.pop();
 		OriginImage = originImage;
+		StateImage = stateImage;
 		FilterImage = filterImage;
 		syncMutex.unlock();
 	}
@@ -109,9 +110,40 @@ namespace AutoDriveCode {
 		syncMutex.unlock();
 		return ret;
 	}
+	Mat StateType::GetStateImage() {
+		syncMutex.lock();
+		Mat ret = StateImage.clone();
+		syncMutex.unlock();
+		return ret;
+	}
 	Mat StateType::GetFilterImage() {
 		syncMutex.lock();
 		Mat ret = FilterImage.clone();
+		syncMutex.unlock();
+		return ret;
+	}
+
+	MotorStateType<int> StateType::GetRear() {
+		syncMutex.lock();
+		MotorStateType<int> ret = Rear;
+		syncMutex.unlock();
+		return ret;
+	}
+	MotorStateType<float> StateType::GetSteer() {
+		syncMutex.lock();
+		MotorStateType<float> ret = Steer;
+		syncMutex.unlock();
+		return ret;
+	}
+	MotorStateType<float> StateType::GetCameraPitch() {
+		syncMutex.lock();
+		MotorStateType<float> ret = CameraPitch;
+		syncMutex.unlock();
+		return ret;
+	}
+	MotorStateType<float> StateType::GetCameraYaw() {
+		syncMutex.lock();
+		MotorStateType<float> ret = CameraYaw;
 		syncMutex.unlock();
 		return ret;
 	}

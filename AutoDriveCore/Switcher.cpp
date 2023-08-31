@@ -14,12 +14,14 @@ namespace AutoDriveCode {
 		m_pubThread = thread(&Switcher::publishThreadFunc, this);
 		m_subStateThread = thread(&Switcher::subscribeStateThreadFunc, this);
 		m_subImageThread = thread(&Switcher::subscribeImageThreadFunc, this);
+		m_updateConnectionThread = thread(&Switcher::updateConnectionThreadFunc, this);
 	}
 	void Switcher::Release() {
 		m_isStop = true;
 		m_pubThread.join();
 		m_subStateThread.join();
 		m_subImageThread.join();
+		m_updateConnectionThread.join();
 	}
 
 	void Switcher::publishThreadFunc() {
@@ -40,12 +42,12 @@ namespace AutoDriveCode {
 				if (cmdCount == 0) {
 					isContinue = true;
 				}
-				else if (cmdCount > 2) {
+				else if (cmdCount > 4) {
 					isContinue = true;
 					m_queueCmd.pop();
 				}
 				else {
-					msg = m_queueCmd.front().clone();
+					msg = m_queueCmd.front()->clone();
 					m_queueCmd.pop();
 				}
 				m_queueCmdMutex.unlock();
@@ -88,7 +90,6 @@ namespace AutoDriveCode {
 						memcpy_s(&t_steer.TarValue, sizeof(t_steer.TarValue), msg[4].data(), msg[4].size());
 						memcpy_s(&t_steer.Speed, sizeof(t_steer.Speed), msg[5].data(), msg[5].size());
 						m_currentState.UpdateMoveMotorState(t_rear, t_steer);
-
 					}
 					else if (topic == "STATE_CAMERA_MOTOR" && msg.size() == 6) {
 						MotorStateType<float> t_cameraPitch;
@@ -133,9 +134,13 @@ namespace AutoDriveCode {
 					vector<char> recvData(msg[1].size());
 					memcpy(recvData.data(), msg[1].data(), msg[1].size());
 
+					StateType stateInfo;
+					m_currentState.Clone(stateInfo);
+
 					Mat originImage = imdecode(recvData, IMREAD_ANYCOLOR);
-					Mat filterImage = ImageFilter::ApplyFilter(originImage);
-					m_currentState.UpdateCameraImage(originImage, filterImage);
+					Mat stateImage = ImageFilter::ApplyStateInfo(originImage, stateInfo);
+					Mat filterImage = ImageFilter::ApplyAdaptiveBrightness(originImage);
+					m_currentState.UpdateCameraImage(originImage, stateImage, filterImage);
 				}
 			}
 			catch (...) {}
@@ -143,11 +148,92 @@ namespace AutoDriveCode {
 
 		subSocket.disconnect(m_pubAddress);
 	}
+	void Switcher::updateConnectionThreadFunc() {
+		while (!m_isStop) {
+			chrono::steady_clock::time_point start = chrono::steady_clock::now();
+
+			shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
+			msg->addstr("COMMAND_PICAR");
+			msg->addstr("UPDATE_CONNECTION");
+			m_queueCmdMutex.lock();
+			m_queueCmd.push(msg);
+			m_queueCmdMutex.unlock();
+
+
+			this_thread::sleep_for(chrono::seconds(1) - (chrono::steady_clock::now() - start));
+		}
+	}
 
 	void Switcher::GetOriginImage(ImageData& imgData) {
 		imgData.Update(m_currentState.GetOriginImage());
 	}
+	void Switcher::GetStateImage(ImageData& imgData) {
+		imgData.Update(m_currentState.GetStateImage());
+	}
 	void Switcher::GetFilterImage(ImageData& imgData) {
 		imgData.Update(m_currentState.GetFilterImage());
+	}
+
+	void Switcher::TurnOff() {
+		shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
+		msg->addstr("COMMAND_PICAR");
+		msg->addstr("TURN_OFF");
+		m_queueCmdMutex.lock();
+		m_queueCmd.push(msg);
+		m_queueCmdMutex.unlock();
+	}
+	void Switcher::StopMove() {
+		shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
+		msg->addstr("COMMAND_MOVE_MOTOR");
+		msg->addstr("REAR_MOTOR");
+		msg->addstr("STOP");
+		msg->addtyp<int>(0);
+		m_queueCmdMutex.lock();
+		m_queueCmd.push(msg);
+		m_queueCmdMutex.unlock();
+	}
+	void Switcher::ChangeRearValue(int diff) {
+		int targetVal = diff == 0 ? 0 : m_currentState.GetRear().CurValue + diff;
+		shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
+		msg->addstr("COMMAND_MOVE_MOTOR");
+		msg->addstr("REAR_MOTOR");
+		msg->addstr("VALUE");
+		msg->addtyp<int>(targetVal);
+		m_queueCmdMutex.lock();
+		m_queueCmd.push(msg);
+		m_queueCmdMutex.unlock();
+	}
+	void Switcher::ChangeSteerValue(float diff) {
+		float targetVal = diff == 0.0 ? 0.0f : m_currentState.GetSteer().CurValue + diff;
+		shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
+		msg->addstr("COMMAND_MOVE_MOTOR");
+		msg->addstr("STEER_MOTOR");
+		msg->addstr("VALUE");
+		msg->addtyp<float>(targetVal);
+		m_queueCmdMutex.lock();
+		m_queueCmd.push(msg);
+		m_queueCmdMutex.unlock();
+	}
+	void Switcher::ChangeCameraPitchValue(float diff) {
+		float targetVal = diff == 0.0 ? 0.0f : m_currentState.GetCameraPitch().CurValue + diff;
+		shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
+		msg->addstr("COMMAND_CAMERA_MOTOR");
+		msg->addstr("PITCH_MOTOR");
+		msg->addstr("VALUE");
+		msg->addtyp<float>(targetVal);
+		m_queueCmdMutex.lock();
+		m_queueCmd.push(msg);
+		m_queueCmdMutex.unlock();
+	}
+	void Switcher::ChangeCameraPitchYaw(float diff) {
+		float targetVal = diff == 0.0 ? 0.0f : m_currentState.GetCameraYaw().CurValue + diff;
+		shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
+		msg->addstr("COMMAND_CAMERA_MOTOR");
+		msg->addstr("YAW_MOTOR");
+		msg->addstr("VALUE");
+		msg->addtyp<float>(targetVal);
+		m_queueCmdMutex.lock();
+		m_queueCmd.push(msg);
+		m_queueCmdMutex.unlock();
 	}
 }
