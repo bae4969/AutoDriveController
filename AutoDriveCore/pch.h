@@ -2,6 +2,8 @@
 #define PCH_H
 
 #include <format>
+#include <future>
+#include <thread>
 
 #include <zmq.hpp>
 #include <zmq_addon.hpp>
