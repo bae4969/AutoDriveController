@@ -12,7 +12,7 @@ namespace AutoDriveCode {
 
 		ImageData();
 		ImageData Clone();
-		void Update(cv::Mat mat);
+		void Update(cv::Mat& mat);
 		void Release();
 	};
 

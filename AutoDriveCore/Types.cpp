@@ -30,8 +30,9 @@ namespace AutoDriveCode {
 
 		return ret;
 	}
-	void ImageData::Update(Mat mat) {
+	void ImageData::Update(Mat& mat) {
 		if (mat.empty()) return;
+		cvtColor(mat, mat, ColorConversionCodes::COLOR_RGB2RGBA);
 
 		if (W == mat.cols &&
 			H == mat.rows &&

@@ -48,7 +48,6 @@ namespace AutoDriveControlor.Imports
 					ImageLockMode.WriteOnly,
 					bitmap.PixelFormat
 				);
-
 				int totMemSize = W * H * Ch * Step;
 				Buffer.MemoryCopy((void*)Data, (void*)imgData.Scan0, totMemSize, totMemSize);
 				bitmap.UnlockBits(imgData);

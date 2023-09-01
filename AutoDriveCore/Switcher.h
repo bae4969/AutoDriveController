@@ -5,25 +5,31 @@
 namespace AutoDriveCode {
 	class Switcher {
 		bool m_isStop;
+		std::thread m_subThread;
 		std::thread m_pubThread;
-		std::thread m_subStateThread;
-		std::thread m_subImageThread;
 		std::thread m_updateConnectionThread;
+		std::thread m_updateStateThread;
+		std::thread m_updateImageThread;
 
 		std::string m_subAddress;
 		std::string m_pubAddress;
 
-		std::mutex m_queueStateMutex;
 		std::mutex m_queueCmdMutex;
-		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueState;
+		std::mutex m_queueStateMutex;
+		std::mutex m_queueImageMutex;
 		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueCmd;
+		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueState;
+		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueImage;
 		StateType m_currentState;
 
 
+		void subscribeThreadFunc();
 		void publishThreadFunc();
-		void subscribeStateThreadFunc();
-		void subscribeImageThreadFunc();
 		void updateConnectionThreadFunc();
+		void updateStateThreadFunc();
+		void updateImageThreadFunc();
+		void updateStateImageThreadFunc(cv::Mat* stateImage, cv::Mat* originImage);
+		void updateFilterImageThreadFunc(cv::Mat* filterImage, cv::Mat* originImage);
 
 	public:
 		void Init(std::string pubAddress, std::string subAddress);

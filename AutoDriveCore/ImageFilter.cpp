@@ -15,6 +15,7 @@ namespace AutoDriveCode {
 			Scalar colorBlue(200, 0, 0);
 			Scalar colorRed(0, 0, 200);
 
+			int frameRate = stateInfo.FrameDateTime.size();
 			int speed = stateInfo.Rear.CurValue;
 			float steerDegree = stateInfo.Steer.CurValue;
 			float yawDegree = stateInfo.CameraYaw.CurValue;
@@ -25,20 +26,24 @@ namespace AutoDriveCode {
 			double rightFloorVal = stateInfo.FloorSensor[2];
 
 			{
-				Point speedStrLoc(20, 30);
-				Point steerStrLoc(20, 60);
-				Point camYawStrLoc(20, 90);
-				Point camPitchStrLoc(20, 120);
+				Point fpsStrLoc(20, 30);
+				Point speedStrLoc(20, 60);
+				Point steerStrLoc(20, 90);
+				Point camYawStrLoc(20, 120);
+				Point camPitchStrLoc(20, 150);
 
+				string fpsStr = std::format("FPS : {:d}", frameRate);
 				string speedStr = std::format("Speed : {:d}", speed);
 				string steerStr = std::format("Steer : {:.01f}", steerDegree);
 				string camYawStr = std::format("Yaw : {:.01f}", yawDegree);
 				string camPitchStr = std::format("Pitch : {:.01f}", pitchDegree);
 
+				putText(dst, fpsStr, fpsStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
 				putText(dst, speedStr, speedStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
 				putText(dst, steerStr, steerStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
 				putText(dst, camYawStr, camYawStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
 				putText(dst, camPitchStr, camPitchStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
+				putText(dst, fpsStr, fpsStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
 				putText(dst, speedStr, speedStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
 				putText(dst, steerStr, steerStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
 				putText(dst, camYawStr, camYawStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
@@ -134,29 +139,40 @@ namespace AutoDriveCode {
 
 			return dst;
 		}
-		Mat ApplyAdaptiveBrightness(Mat& src) {
-			Mat dst = src.clone();
-			Size size = src.size();
+		Mat AdjustBrightness(Mat& src) {
+			Mat dst = src;
+			Size srcSize = src.size();
 
-			double minv = DBL_MAX;
-			double maxv = DBL_MIN;
-			Scalar meanVal;
-			Scalar stdDev;
-			meanStdDev(dst, meanVal, stdDev);
-			for (int i = 0; i < 3; i++) {
-				double t_minv = meanVal[i] - 2.0 * stdDev[i];
-				double t_maxv = meanVal[i] + 2.0 * stdDev[i];
-				if (minv > t_minv)
-					minv = t_minv;
-				if (maxv < t_maxv)
-					maxv = t_maxv;
+			{
+				int margin = 5;
+				Rect edgeCut(margin, margin, src.cols - margin * 2, src.rows - margin * 2);
+				dst = dst(edgeCut).clone();
+				srcSize = dst.size();
 			}
-			dst.setTo(minv, dst < minv);
-			dst.setTo(maxv, dst > maxv);
-			normalize(dst, dst, 0, UCHAR_MAX, NORM_MINMAX);
 
-			Mat rotMat = getRotationMatrix2D(Point2f(size.width * 0.5, size.height * 0.5), -2.0, 1.0);
-			warpAffine(dst, dst, rotMat, Size());
+			{
+				double rotDegree = -2.20;
+				Point2f rotCenter(srcSize.width * 0.5, srcSize.height * 0.5);
+				Mat rotMat = getRotationMatrix2D(rotCenter, rotDegree, 1.0);
+				warpAffine(dst, dst, rotMat, Size(), INTER_LINEAR);
+
+				Point2d rb(srcSize.width, srcSize.height);
+				Point2d rotOrigin;
+				Size2d rotSize;
+				rotOrigin.x = abs(srcSize.width - (rotMat.at<double>(0, 0) * srcSize.width + rotMat.at<double>(0, 2)));
+				rotOrigin.y = abs(srcSize.height - (rotMat.at<double>(1, 1) * srcSize.height + rotMat.at<double>(1, 2)));
+				rotSize.width = srcSize.width - rotOrigin.x * 2.0;
+				rotSize.height = srcSize.height - rotOrigin.y * 2.0;
+
+				Rect rotCut(rotOrigin, rotSize);
+				dst = dst(rotCut).clone();
+				srcSize = dst.size();
+			}
+
+			{
+				GaussianBlur(dst, dst, Size(), 1);
+				normalize(dst, dst, 0, UCHAR_MAX, NORM_MINMAX);
+			}
 
 			return dst;
 		}

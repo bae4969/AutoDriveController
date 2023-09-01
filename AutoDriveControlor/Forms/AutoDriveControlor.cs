@@ -19,6 +19,7 @@ namespace AutoDriveControlor.Forms
 	{
 		private bool IsStopToUpdateCamera = false;
 		private Task? CameraViewTask = null;
+		private object ImageLock = new();
 		private PictureBox? ZoomInPb = null;
 		private Bitmap? StateImage = null;
 		private Bitmap? FilterImage = null;
@@ -31,16 +32,19 @@ namespace AutoDriveControlor.Forms
 
 				Core.ImageData? stateData = Core.GetStateImage();
 				Core.ImageData? filterData = Core.GetFilterImage();
-				Bitmap? t_stateImage = StateImage;
-				Bitmap? t_filterImage = FilterImage;
-				StateImage = stateData?.ToBitmap();
-				FilterImage = filterData?.ToBitmap();
-				t_stateImage?.Dispose();
-				t_filterImage?.Dispose();
+				lock (ImageLock)
+				{
+					Bitmap? t_stateImage = StateImage;
+					Bitmap? t_filterImage = FilterImage;
+					StateImage = stateData?.ToBitmap();
+					FilterImage = filterData?.ToBitmap();
+					t_stateImage?.Dispose();
+					t_filterImage?.Dispose();
+				}
 				PB_ViewTL.Invalidate();
 				PB_ViewTR.Invalidate();
 
-				if ((DateTime.Now - start).Milliseconds < 33)
+				if ((TimeSpan.FromMilliseconds(33) - (DateTime.Now - start)).Milliseconds > 0)
 					Thread.Sleep(TimeSpan.FromMilliseconds(33) - (DateTime.Now - start));
 			}
 		}
@@ -88,27 +92,37 @@ namespace AutoDriveControlor.Forms
 		}
 		private void PB_ViewTL_Paint(object sender, PaintEventArgs e)
 		{
-			if (StateImage == null) return;
-
-			PictureBox targetPB = (PictureBox)sender;
-			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, StateImage.Size);
-			e.Graphics.DrawImage(StateImage, zommImgRect);
+			lock (ImageLock)
+			{
+				if (StateImage == null) return;
+				PictureBox targetPB = (PictureBox)sender;
+				RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, StateImage.Size);
+				e.Graphics.DrawImage(StateImage, zommImgRect);
+			}
 		}
 		private void PB_ViewTR_Paint(object sender, PaintEventArgs e)
 		{
-			if (FilterImage == null) return;
-
-			PictureBox targetPB = (PictureBox)sender;
-			RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, FilterImage.Size);
-			e.Graphics.DrawImage(FilterImage, zommImgRect);
+			lock (ImageLock)
+			{
+				if (FilterImage == null) return;
+				PictureBox targetPB = (PictureBox)sender;
+				RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, FilterImage.Size);
+				e.Graphics.DrawImage(FilterImage, zommImgRect);
+			}
 		}
 		private void PB_ViewBL_Paint(object sender, PaintEventArgs e)
 		{
+			lock (ImageLock)
+			{
 
+			}
 		}
 		private void PB_ViewBR_Paint(object sender, PaintEventArgs e)
 		{
+			lock (ImageLock)
+			{
 
+			}
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,6 +315,15 @@ namespace AutoDriveControlor.Forms
 		private void AbsorbFocus(object sender, EventArgs e)
 		{
 			this.Focus();
+		}
+
+		private void BTN_TSET_Click(object sender, EventArgs e)
+		{
+			lock (ImageLock)
+			{
+				StateImage?.Save("../../1_state.png");
+				FilterImage?.Save("../../2_filter.png");
+			}
 		}
 	}
 }

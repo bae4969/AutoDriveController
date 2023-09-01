@@ -5,6 +5,9 @@
 #include <future>
 #include <thread>
 
+#include <Windows.h>
+#include <debugapi.h>
+
 #include <zmq.hpp>
 #include <zmq_addon.hpp>
 #include <zmq_utils.h>
