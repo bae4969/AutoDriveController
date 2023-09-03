@@ -3,7 +3,9 @@
 
 namespace AutoDriveCode {
 	namespace ImageFilter {
-		cv::Mat ApplyStateInfo(cv::Mat& src, StateType& stateInfo);
-		cv::Mat AdjustBrightness(cv::Mat& src);
+		cv::Mat DrawStateInfoFilter(cv::Mat& src, MachineStateType& stateInfo);
+		cv::Mat CalibrationCameraFilter(cv::Mat& src, CameraCaliDataType& caliData);
+		PTLCPtr ConvertImageToPointCloud(cv::Mat& src, CameraCaliDataType& caliData, MachineStateType& stateInfo);
 	}
 }
+

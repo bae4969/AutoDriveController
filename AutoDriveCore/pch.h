@@ -15,5 +15,16 @@
 #include <opencv2/opencv.hpp>
 
 #include <pcl/point_cloud.h>
+#include <pcl/io/file_io.h>
+#include <pcl/io/ascii_io.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/visualization/image_viewer.h>
+#include <pcl/visualization/histogram_visualizer.h>
+#include <pcl/visualization/pcl_plotter.h>
+#include <pcl/visualization/point_picking_event.h>
+#include <pcl/common/transforms.h>
+
+#include <vtkRenderWindow.h>
 
 #endif

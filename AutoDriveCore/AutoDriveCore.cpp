@@ -35,6 +35,10 @@ namespace AutoDriveCode {
 		return g_FilterImage;
 	}
 
+	void SetPointCloudViewerWindow(void* handle) {
+		g_Switcher.SetPointCloudViwerWindow(handle);
+	}
+
 	void TurnOff() {
 		g_Switcher.TurnOff();
 	}
@@ -50,7 +54,7 @@ namespace AutoDriveCode {
 	void ChangeCameraPitchValue(float diff) {
 		g_Switcher.ChangeCameraPitchValue(diff);
 	}
-	void ChangeCameraPitchYaw(float diff) {
-		g_Switcher.ChangeCameraPitchYaw(diff);
+	void ChangeCameraYawValue(float diff) {
+		g_Switcher.ChangeCameraYawValue(diff);
 	}
 }

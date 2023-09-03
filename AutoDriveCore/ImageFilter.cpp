@@ -6,7 +6,11 @@ namespace AutoDriveCode {
 		using namespace std;
 		using namespace cv;
 
-		Mat ApplyStateInfo(Mat& src, StateType& stateInfo) {
+		using namespace std;
+		using namespace cv;
+
+
+		Mat DrawStateInfoFilter(Mat& src, MachineStateType& stateInfo) {
 			Mat dst = src.clone();
 			Size size = src.size();
 
@@ -25,6 +29,7 @@ namespace AutoDriveCode {
 			double centorFloorVal = stateInfo.FloorSensor[1];
 			double rightFloorVal = stateInfo.FloorSensor[2];
 
+			// 좌상단 숫자 정보
 			{
 				Point fpsStrLoc(20, 30);
 				Point speedStrLoc(20, 60);
@@ -49,6 +54,8 @@ namespace AutoDriveCode {
 				putText(dst, camYawStr, camYawStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
 				putText(dst, camPitchStr, camPitchStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
 			}
+
+			// 속도값
 			{
 				Size layoutSize(80, 200);
 				int bgYOffset = size.height - 20 - layoutSize.height;
@@ -71,6 +78,8 @@ namespace AutoDriveCode {
 					rectangle(dst, speedFGRect, colorBlue, FILLED);
 				}
 			}
+
+			// 스티어러 각도
 			{
 				Point steerArrowFrom(200, size.height - 40);
 				Point steerArrowVec(0, -140);
@@ -86,6 +95,8 @@ namespace AutoDriveCode {
 				arrowedLine(dst, steerArrowFrom, steerArrowTo, colorBlack, 20);
 				arrowedLine(dst, steerArrowFrom, steerArrowTo, colorWhite, 12);
 			}
+
+			// 카메라 위치 표시
 			{
 				Size bgSize(200, 160);
 				double x_cos = sin(DEGREE_TO_RADIAN(yawDegree)) * 90.0;
@@ -97,6 +108,8 @@ namespace AutoDriveCode {
 				rectangle(dst, camBGRect, colorWhite, FILLED);
 				circle(dst, camFGLoc, 10, colorRed, FILLED);
 			}
+
+			// 음파 거리값 출력
 			{
 				Point distanceStrLoc(size.width * 0.5, size.height - 60);
 
@@ -112,6 +125,8 @@ namespace AutoDriveCode {
 				putText(dst, distanceStr, bgStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
 				putText(dst, distanceStr, fgStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
 			}
+
+			// 하단 센서값
 			{
 				Point leftLoc(size.width * 0.5 - 30, size.height - 30);
 				Point centerLoc(size.width * 0.5, size.height - 30);
@@ -139,19 +154,21 @@ namespace AutoDriveCode {
 
 			return dst;
 		}
-		Mat AdjustBrightness(Mat& src) {
+		Mat CalibrationCameraFilter(Mat& src, CameraCaliDataType& caliData) {
 			Mat dst = src;
 			Size srcSize = src.size();
 
+			// 외각에 생기는 bad pixel 자르기
 			{
-				int margin = 5;
+				int margin = caliData.Margin;
 				Rect edgeCut(margin, margin, src.cols - margin * 2, src.rows - margin * 2);
 				dst = dst(edgeCut).clone();
 				srcSize = dst.size();
 			}
 
-			{
-				double rotDegree = -2.20;
+			// 회전 및 빈공간 자르기
+			if(false) {
+				double rotDegree = caliData.RollDegree;
 				Point2f rotCenter(srcSize.width * 0.5, srcSize.height * 0.5);
 				Mat rotMat = getRotationMatrix2D(rotCenter, rotDegree, 1.0);
 				warpAffine(dst, dst, rotMat, Size(), INTER_LINEAR);
@@ -169,12 +186,68 @@ namespace AutoDriveCode {
 				srcSize = dst.size();
 			}
 
+			// 단순 블러 + 노말
 			{
 				GaussianBlur(dst, dst, Size(), 1);
 				normalize(dst, dst, 0, UCHAR_MAX, NORM_MINMAX);
 			}
 
 			return dst;
+		}
+		PTLCPtr ConvertImageToPointCloud(Mat& src, CameraCaliDataType& caliData, MachineStateType& stateInfo) {
+			Mat t_src;
+
+			// 외각에 생기는 bad pixel 자르기
+			{
+				int margin = caliData.Margin;
+				Rect edgeCut(margin, margin, src.cols - margin * 2, src.rows - margin * 2);
+				t_src = src(edgeCut).clone();
+			}
+
+			Size srcSize = caliData.PointCloudSize;
+			resize(t_src, t_src, srcSize);
+
+			float imgXDistanceRate = 1.0f;
+			float imgYDistanceRate = 0.7f;
+
+			float distance = 100.f;
+			float x_scale = imgXDistanceRate / srcSize.width * distance;
+			float z_scale = imgYDistanceRate / srcSize.height * distance;
+			float x_offset = -srcSize.width * 0.5f;
+			float z_offset = -srcSize.height * 0.5f;
+
+			PTCPtr offsetPc = caliData.PointOffsets;
+			PCL_NEW(PTLCType, srcPc);
+			srcPc->resize(srcSize.area());
+			for (int y = 0; y < srcSize.height; y++) {
+				for (int x = 0; x < srcSize.width; x++) {
+					size_t idx = y * srcSize.width + x;
+					PTType& offset = offsetPc->at(idx);
+					PTLType& pt = srcPc->at(idx);
+					Vec3b& pxl = t_src.at<Vec3b>(idx);
+					pt.x = offset.x;
+					pt.y = offset.y;
+					pt.z = offset.z;
+					pt.b = pxl[0];
+					pt.g = pxl[1];
+					pt.r = pxl[2];
+					pt.a = 255;
+				}
+			}
+
+			Eigen::AngleAxisd roll(DEGREE_TO_RADIAN(caliData.RollDegree), -Eigen::Vector3d::UnitY());
+			Eigen::AngleAxisd yaw(DEGREE_TO_RADIAN(stateInfo.CameraYaw.CurValue), -Eigen::Vector3d::UnitZ());
+			Eigen::AngleAxisd pitch(DEGREE_TO_RADIAN(stateInfo.CameraPitch.CurValue), Eigen::Vector3d::UnitX());
+			Eigen::Matrix3d rotationMatrix = (roll * yaw * pitch).matrix();
+
+			Eigen::Matrix4f transMat = Eigen::Matrix4f::Identity();
+			for (int i = 0; i < 3; i++)for (int j = 0; j < 3; j++)
+				transMat.col(i)[j] = rotationMatrix.col(i)[j];
+
+			PCL_NEW(PTLCType, dstPC);
+			pcl::transformPointCloud(*srcPc, *dstPC, transMat);
+
+			return dstPC;
 		}
 	}
 }

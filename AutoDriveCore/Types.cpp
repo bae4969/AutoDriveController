@@ -62,7 +62,7 @@ namespace AutoDriveCode {
 		}
 	}
 
-	void StateType::Clone(StateType& state) {
+	void MachineStateType::Clone(MachineStateType& state) {
 		syncMutex.lock();
 		state.Rear = Rear;
 		state.Steer = Steer;
@@ -71,82 +71,143 @@ namespace AutoDriveCode {
 		state.SonicSensor = SonicSensor;
 		state.FloorSensor = FloorSensor;
 		state.FrameDateTime = FrameDateTime;
-		state.OriginImage = OriginImage.clone();
-		state.FilterImage = FilterImage.clone();
 		syncMutex.unlock();
 	}
-	void StateType::UpdateMoveMotorState(MotorStateType<int>& rear, MotorStateType<float>& steer) {
+	void MachineStateType::UpdateMoveMotorState(MotorStateType<int>& rear, MotorStateType<float>& steer) {
 		syncMutex.lock();
 		Rear = rear;
 		Steer = steer;
 		syncMutex.unlock();
 	}
-	void StateType::UpdateCameraMotorState(MotorStateType<float>& cameraPitch, MotorStateType<float>& cameraYaw) {
+	void MachineStateType::UpdateCameraMotorState(MotorStateType<float>& cameraPitch, MotorStateType<float>& cameraYaw) {
 		syncMutex.lock();
 		CameraPitch = cameraPitch;
 		CameraYaw = cameraYaw;
 		syncMutex.unlock();
 	}
-	void StateType::UpdateSensorState(double& sonicSensor, std::vector<int>& floorSensor) {
+	void MachineStateType::UpdateSensorState(double& sonicSensor, std::vector<int>& floorSensor) {
 		syncMutex.lock();
 		SonicSensor = sonicSensor;
 		FloorSensor = floorSensor;
 		syncMutex.unlock();
 	}
-	void StateType::UpdateCameraImage(Mat& originImage, Mat& stateImage, Mat& filterImage) {
+	void MachineStateType::UpdateFPS() {
 		auto now = chrono::steady_clock::now();
 		syncMutex.lock();
 		FrameDateTime.push(now);
 		while ((now - FrameDateTime.front()) > chrono::seconds(1))
 			FrameDateTime.pop();
-		OriginImage = originImage;
-		StateImage = stateImage;
-		FilterImage = filterImage;
 		syncMutex.unlock();
 	}
 
-	Mat StateType::GetOriginImage() {
-		syncMutex.lock();
-		Mat ret = OriginImage.clone();
-		syncMutex.unlock();
-		return ret;
-	}
-	Mat StateType::GetStateImage() {
-		syncMutex.lock();
-		Mat ret = StateImage.clone();
-		syncMutex.unlock();
-		return ret;
-	}
-	Mat StateType::GetFilterImage() {
-		syncMutex.lock();
-		Mat ret = FilterImage.clone();
-		syncMutex.unlock();
-		return ret;
-	}
-
-	MotorStateType<int> StateType::GetRear() {
+	MotorStateType<int> MachineStateType::GetRear() {
 		syncMutex.lock();
 		MotorStateType<int> ret = Rear;
 		syncMutex.unlock();
 		return ret;
 	}
-	MotorStateType<float> StateType::GetSteer() {
+	MotorStateType<float> MachineStateType::GetSteer() {
 		syncMutex.lock();
 		MotorStateType<float> ret = Steer;
 		syncMutex.unlock();
 		return ret;
 	}
-	MotorStateType<float> StateType::GetCameraPitch() {
+	MotorStateType<float> MachineStateType::GetCameraPitch() {
 		syncMutex.lock();
 		MotorStateType<float> ret = CameraPitch;
 		syncMutex.unlock();
 		return ret;
 	}
-	MotorStateType<float> StateType::GetCameraYaw() {
+	MotorStateType<float> MachineStateType::GetCameraYaw() {
 		syncMutex.lock();
 		MotorStateType<float> ret = CameraYaw;
 		syncMutex.unlock();
 		return ret;
+	}
+
+	void ImageStateType::UpdateOriginImage(Mat& originImage) {
+		syncMutex.lock();
+		OriginImage = originImage;
+		syncMutex.unlock();
+	}
+	void ImageStateType::UpdateStateImage(Mat& stateImage) {
+		syncMutex.lock();
+		StateImage.release();
+		StateImage = stateImage;
+		syncMutex.unlock();
+	}
+	void ImageStateType::UpdateFilterImage(Mat& filterImage) {
+		syncMutex.lock();
+		FilterImage.release();
+		FilterImage = filterImage;
+		syncMutex.unlock();
+	}
+	void ImageStateType::UpdatePointCloud(PTLCPtr& pointCloud) {
+		syncMutex.lock();
+		PointCloud = pointCloud;
+		syncMutex.unlock();
+	}
+
+	Mat ImageStateType::GetOriginImage() {
+		syncMutex.lock();
+		Mat ret = OriginImage.clone();
+		syncMutex.unlock();
+		return ret;
+	}
+	Mat ImageStateType::GetStateImage() {
+		syncMutex.lock();
+		Mat ret = StateImage.clone();
+		syncMutex.unlock();
+		return ret;
+	}
+	Mat ImageStateType::GetFilterImage() {
+		syncMutex.lock();
+		Mat ret = FilterImage.clone();
+		syncMutex.unlock();
+		return ret;
+	}
+	PTLCPtr ImageStateType::GetPointCloud() {
+		syncMutex.lock();
+		PTLCPtr ret(PointCloud);
+		syncMutex.unlock();
+		return ret;
+	}
+
+	void CameraCaliDataType::Init() {
+		Margin = 4;
+		RollDegree = -2.1;
+
+		PointCloudSize.width = 640 - Margin;
+		PointCloudSize.height = 480 - Margin;
+
+
+		float imgXDistanceRate = 1.0f;
+		float imgYDistanceRate = 0.7f;
+
+		float distance = 100.f;
+		float x_scale = imgXDistanceRate / PointCloudSize.width * distance;
+		float z_scale = imgYDistanceRate / PointCloudSize.height * distance;
+		float x_offset = -PointCloudSize.width * 0.5f;
+		float z_offset = -PointCloudSize.height * 0.5f;
+
+		PTCPtr t_offset(new PTCType());
+		t_offset->resize(PointCloudSize.area());
+		for (int y = 0; y < PointCloudSize.height; y++) {
+			for (int x = 0; x < PointCloudSize.width; x++) {
+				size_t idx = y * PointCloudSize.width + x;
+				PTType& pt = t_offset->at(idx);
+				pt.x = (x_offset + x) * x_scale;
+				pt.y = distance;
+				pt.z = -(z_offset + y) * z_scale;
+
+				float scalrValue = sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z);
+				float multiValue = distance / scalrValue;
+				pt.x *= multiValue;
+				pt.y *= multiValue;
+				pt.z *= multiValue;
+			}
+		}
+		PointOffsets = t_offset;
 	}
 }
 

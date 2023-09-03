@@ -27,10 +27,10 @@
     <ClInclude Include="Defs.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="ImageFilter.h">
+    <ClInclude Include="Switcher.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Switcher.h">
+    <ClInclude Include="ImageFilter.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
@@ -44,10 +44,10 @@
     <ClCompile Include="Types.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="ImageFilter.cpp">
+    <ClCompile Include="Switcher.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="Switcher.cpp">
+    <ClCompile Include="ImageFilter.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

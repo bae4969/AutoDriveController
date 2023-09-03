@@ -288,9 +288,9 @@ namespace AutoDriveControlor.Forms
 		private void CommandPitchUp() { Core.ChangeCameraPitchValue(10.0f); }
 		private void CommandPitchDown() { Core.ChangeCameraPitchValue(-10.0f); }
 
-		private void CommandYawReset() { Core.ChangeCameraPitchYaw(0.0f); }
-		private void CommandYawRight() { Core.ChangeCameraPitchYaw(10.0f); }
-		private void CommandYawLeft() { Core.ChangeCameraPitchYaw(-10.0f); }
+		private void CommandYawReset() { Core.ChangeCameraYawValue(0.0f); }
+		private void CommandYawRight() { Core.ChangeCameraYawValue(10.0f); }
+		private void CommandYawLeft() { Core.ChangeCameraYawValue(-10.0f); }
 
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -301,6 +301,7 @@ namespace AutoDriveControlor.Forms
 		private void AutoDriveControlor_Load(object sender, EventArgs e)
 		{
 			Core.Init(CONNECTION_STRINGS.EXTERN_SUB, CONNECTION_STRINGS.EXTERN_PUB);
+			Core.SetPointCloudViewerWindow(PB_ViewBL.Handle);
 			CameraViewTask = Task.Run(() => { UpdateCameraViewThreadFunc(); });
 			CommandTask = Task.Run(() => { UpdateCommandThreadFunc(); });
 		}
@@ -324,6 +325,11 @@ namespace AutoDriveControlor.Forms
 				StateImage?.Save("../../1_state.png");
 				FilterImage?.Save("../../2_filter.png");
 			}
+		}
+
+		private void BTN_ShowViewer_Click(object sender, EventArgs e)
+		{
+			this.Focus();
 		}
 	}
 }

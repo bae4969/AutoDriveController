@@ -35,6 +35,7 @@
 			TLP_ViewLayoutTable = new TableLayoutPanel();
 			SC_ViewAndControl = new SplitContainer();
 			BTN_TSET = new Button();
+			BTN_ShowViewer = new Button();
 			((System.ComponentModel.ISupportInitialize)PB_ViewTL).BeginInit();
 			((System.ComponentModel.ISupportInitialize)PB_ViewTR).BeginInit();
 			((System.ComponentModel.ISupportInitialize)PB_ViewBL).BeginInit();
@@ -134,6 +135,7 @@
 			// 
 			// SC_ViewAndControl.Panel2
 			// 
+			SC_ViewAndControl.Panel2.Controls.Add(BTN_ShowViewer);
 			SC_ViewAndControl.Panel2.Controls.Add(BTN_TSET);
 			SC_ViewAndControl.Size = new Size(1184, 761);
 			SC_ViewAndControl.SplitterDistance = 969;
@@ -148,6 +150,16 @@
 			BTN_TSET.Text = "test";
 			BTN_TSET.UseVisualStyleBackColor = true;
 			BTN_TSET.Click += BTN_TSET_Click;
+			// 
+			// BTN_ShowViewer
+			// 
+			BTN_ShowViewer.Location = new Point(47, 517);
+			BTN_ShowViewer.Name = "BTN_ShowViewer";
+			BTN_ShowViewer.Size = new Size(115, 33);
+			BTN_ShowViewer.TabIndex = 1;
+			BTN_ShowViewer.Text = "Show Viewer";
+			BTN_ShowViewer.UseVisualStyleBackColor = true;
+			BTN_ShowViewer.Click += BTN_ShowViewer_Click;
 			// 
 			// AutoDriveControlor
 			// 
@@ -200,5 +212,6 @@
 		private TableLayoutPanel TLP_ViewLayoutTable;
 		private SplitContainer SC_ViewAndControl;
 		private Button BTN_TSET;
+		private Button BTN_ShowViewer;
 	}
 }
