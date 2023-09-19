@@ -1,6 +1,7 @@
 #pragma once
 #include "Types.h"
 #include <zmq_addon.hpp>
+#include <opencv2/core.hpp>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
@@ -12,32 +13,35 @@ namespace AutoDriveCode {
 		};
 
 		bool m_isStop;
-		std::thread m_subThread;
-		std::thread m_pubThread;
-		std::thread m_updateConnectionThread;
-		std::thread m_updateStateThread;
-		std::thread m_updateImageThread;
-		std::thread m_updateViewerThread;
+		std::shared_ptr<std::thread> m_subThread;
+		std::shared_ptr<std::thread> m_pubThread;
+		std::shared_ptr<std::thread> m_updateConnectionThread;
+		std::shared_ptr<std::thread> m_updateStateThread;
+		std::shared_ptr<std::thread> m_updateLidarThread;
+		std::shared_ptr<std::thread> m_updateImageThread;
+		std::shared_ptr<std::thread> m_updateConclusionThread;
 
 		std::string m_subAddress;
 		std::string m_pubAddress;
+		pcl::visualization::PCLVisualizer::Ptr m_viewer;
 
 		std::mutex m_queueCmdMutex;
 		std::mutex m_queueStateMutex;
+		std::mutex m_queueLidarMutex;
 		std::mutex m_queueImageMutex;
 		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueCmd;
 		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueState;
+		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueLidar;
 		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueImage;
 
+		std::mutex m_stateImageMutex;
+		cv::Mat m_stateImage;
+		DeltaImageType m_currentCameraImage;
 		MachineStateType m_currentMachineState;
-		ImageStateType m_currentCameraState;
-		CameraCaliDataType m_cameraCaliData;
+		CaliDataType m_caliData;
 
-		std::mutex m_viwerMutex;
-		pcl::visualization::PCLVisualizer::Ptr m_viewer;
-
-		bool m_isBusy;
-		std::mutex m_pipelineMutex[4];
+		DeltaImageType m_targetCameraImage;
+		DeltaLidarPoint m_targetLidarPoint;
 
 
 		void subscribeThreadFunc();
@@ -45,18 +49,16 @@ namespace AutoDriveCode {
 		void updateConnectionThreadFunc();
 		void updateStateThreadFunc();
 		void updateImageThreadFunc();
-		void updateViewerThreadFunc();
-		void updatePipelineThreadFunc(cv::Mat originImage);
+		void updateLidarThreadFunc();
+		void updateConclusionThreadFunc();
 
 	public:
-		void Init(std::string pubAddress, std::string subAddress);
+		void Init(std::string pubAddress, std::string subAddress, void* pcWndHandle);
 		void Release();
 
-		void GetOriginImage(ImageData& imgData);
-		void GetStateImage(ImageData& imgData);
-		void GetFilterImage(ImageData& imgData);
+		void ExecuteEventCameraPointCloudCapture();
 
-		void SetPointCloudViwerWindow(void* handle);
+		void GetStateImage(ImageData& imgData);
 
 		void TurnOff();
 		void StopMove();

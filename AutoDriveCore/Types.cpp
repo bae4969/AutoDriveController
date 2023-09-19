@@ -71,6 +71,8 @@ namespace AutoDriveCode {
 		state.SonicSensor = SonicSensor;
 		state.FloorSensor = FloorSensor;
 		state.FrameDateTime = FrameDateTime;
+		state.MachineTemperature = MachineTemperature;
+		state.MachineStateBits = MachineStateBits;
 		syncMutex.unlock();
 	}
 	void MachineStateType::UpdateMoveMotorState(MotorStateType<int>& rear, MotorStateType<float>& steer) {
@@ -91,8 +93,14 @@ namespace AutoDriveCode {
 		FloorSensor = floorSensor;
 		syncMutex.unlock();
 	}
+	void MachineStateType::UpdateLcdState(double& temp, int& state) {
+		syncMutex.lock();
+		MachineTemperature = temp;
+		MachineStateBits = state;
+		syncMutex.unlock();
+	}
 	void MachineStateType::UpdateFPS() {
-		auto now = chrono::steady_clock::now();
+		auto now = ClockType::now();
 		syncMutex.lock();
 		FrameDateTime.push(now);
 		while ((now - FrameDateTime.front()) > chrono::seconds(1))
@@ -124,69 +132,46 @@ namespace AutoDriveCode {
 		syncMutex.unlock();
 		return ret;
 	}
-
-	void ImageStateType::UpdateOriginImage(Mat& originImage) {
+	double MachineStateType::GetSonicValue() {
 		syncMutex.lock();
-		OriginImage = originImage;
-		syncMutex.unlock();
-	}
-	void ImageStateType::UpdateStateImage(Mat& stateImage) {
-		syncMutex.lock();
-		StateImage.release();
-		StateImage = stateImage;
-		syncMutex.unlock();
-	}
-	void ImageStateType::UpdateFilterImage(Mat& filterImage) {
-		syncMutex.lock();
-		FilterImage.release();
-		FilterImage = filterImage;
-		syncMutex.unlock();
-	}
-	void ImageStateType::UpdatePointCloud(PTLCPtr& pointCloud) {
-		syncMutex.lock();
-		PointCloud = pointCloud;
-		syncMutex.unlock();
-	}
-
-	Mat ImageStateType::GetOriginImage() {
-		syncMutex.lock();
-		Mat ret = OriginImage.clone();
+		double ret = SonicSensor;
 		syncMutex.unlock();
 		return ret;
 	}
-	Mat ImageStateType::GetStateImage() {
+	int MachineStateType::GetFloorValue(int idx) {
 		syncMutex.lock();
-		Mat ret = StateImage.clone();
+		int ret = FloorSensor[idx];
 		syncMutex.unlock();
 		return ret;
 	}
-	Mat ImageStateType::GetFilterImage() {
+	int MachineStateType::GetFPS() {
 		syncMutex.lock();
-		Mat ret = FilterImage.clone();
+		int ret = FrameDateTime.size();
 		syncMutex.unlock();
 		return ret;
 	}
-	PTLCPtr ImageStateType::GetPointCloud() {
+	double MachineStateType::GetTemperature() {
 		syncMutex.lock();
-		PTLCPtr ret(PointCloud);
+		double ret = MachineTemperature;
+		syncMutex.unlock();
+		return ret;
+	}
+	int MachineStateType::GetStateBits() {
+		syncMutex.lock();
+		int ret = MachineStateBits;
 		syncMutex.unlock();
 		return ret;
 	}
 
-	void CameraCaliDataType::Init() {
-		Margin = 4;
+	void CaliDataType::Init() {
+		Margin = IMAGE_EDGE_CUT_MARGIN;
 		RollDegree = -2.1;
 
-		PointCloudSize.width = 640 - Margin;
-		PointCloudSize.height = 480 - Margin;
+		PointCloudSize.width = (CAMERA_IMAGE_WIDTH - (2 * Margin)) * IMAGE_TO_POINT_SIZE_RATE;
+		PointCloudSize.height = (CAMERA_IMAGE_HEIGHT - (2 * Margin)) * IMAGE_TO_POINT_SIZE_RATE;
 
-
-		float imgXDistanceRate = 1.0f;
-		float imgYDistanceRate = 0.7f;
-
-		float distance = 100.f;
-		float x_scale = imgXDistanceRate / PointCloudSize.width * distance;
-		float z_scale = imgYDistanceRate / PointCloudSize.height * distance;
+		float x_scale = CAMERA_IMAGE_X_DISTANCE_RATE * IMAGE_POINT_DEFAULT_DISTANCE / PointCloudSize.width;
+		float z_scale = CAMERA_IMAGE_Y_DISTANCE_RATE * IMAGE_POINT_DEFAULT_DISTANCE / PointCloudSize.height;
 		float x_offset = -PointCloudSize.width * 0.5f;
 		float z_offset = -PointCloudSize.height * 0.5f;
 
@@ -197,17 +182,67 @@ namespace AutoDriveCode {
 				size_t idx = y * PointCloudSize.width + x;
 				PTType& pt = t_offset->at(idx);
 				pt.x = (x_offset + x) * x_scale;
-				pt.y = distance;
+				pt.y = IMAGE_POINT_DEFAULT_DISTANCE;
 				pt.z = -(z_offset + y) * z_scale;
 
 				float scalrValue = sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z);
-				float multiValue = distance / scalrValue;
+				float multiValue = IMAGE_POINT_DEFAULT_DISTANCE / scalrValue;
 				pt.x *= multiValue;
 				pt.y *= multiValue;
 				pt.z *= multiValue;
 			}
 		}
 		PointOffsets = t_offset;
+
+		Eigen::AngleAxisd roll(DEGREE_TO_RADIAN(RollDegree), -Eigen::Vector3d::UnitY());
+		Eigen::Matrix3d rotationMatrix = roll.matrix();
+		Eigen::Matrix4f transMat = Eigen::Matrix4f::Identity();
+		for (int i = 0; i < 3; i++)for (int j = 0; j < 3; j++)
+			transMat.col(i)[j] = rotationMatrix.col(i)[j];
+
+		PointOffsets = make_shared<PTCType>();
+		pcl::transformPointCloud(*t_offset, *PointOffsets, transMat);
+	}
+
+
+	void DeltaImageType::Set(DeltaImageType& deltaImage) {
+		syncMutex.lock();
+		deltaImage.syncMutex.lock();
+		Time = deltaImage.Time;
+		Image = deltaImage.Image;
+		PitchDegree = deltaImage.PitchDegree;
+		YawDegree = deltaImage.YawDegree;
+		deltaImage.syncMutex.unlock();
+		syncMutex.unlock();
+	}
+	void DeltaImageType::Set(Mat img, float pitch, float yaw) {
+		syncMutex.lock();
+		Time = ClockType::now();
+		Image = img;
+		PitchDegree = pitch;
+		YawDegree = yaw;
+		syncMutex.unlock();
+	}
+	void DeltaImageType::Get(ClockType::time_point& time, Mat& img, float& pitch, float& yaw) {
+		syncMutex.lock();
+		time = Time;
+		img = Image;
+		pitch = PitchDegree;
+		yaw = YawDegree;
+		syncMutex.unlock();
+	}
+
+	void DeltaLidarPoint::Set(PTCPtr pc) {
+		syncMutex.lock();
+		Time = ClockType::now();
+		LidarPoints = pc;
+		syncMutex.unlock();
+	}
+	void DeltaLidarPoint::Get(ClockType::time_point& time, PTCPtr& pc) {
+		syncMutex.lock();
+		time = Time;
+		pc = LidarPoints;
+		syncMutex.unlock();
 	}
 }
 

@@ -3,14 +3,12 @@
 #include "Types.h"
 
 namespace AutoDriveCode {
-	AUTODRIVECORE_EXPORT void Init(char* pubAddress, char* subAddress);
+	AUTODRIVECORE_EXPORT void Init(char* pubAddress, char* subAddress, void* handle);
 	AUTODRIVECORE_EXPORT void Release();
 
-	AUTODRIVECORE_EXPORT ImageData GetOriginImage();
 	AUTODRIVECORE_EXPORT ImageData GetStateImage();
-	AUTODRIVECORE_EXPORT ImageData GetFilterImage();
 
-	AUTODRIVECORE_EXPORT void SetPointCloudViewerWindow(void* handle);
+	AUTODRIVECORE_EXPORT void ExecuteEvent(char* eventName);
 
 	AUTODRIVECORE_EXPORT void TurnOff();
 	AUTODRIVECORE_EXPORT void StopMove();

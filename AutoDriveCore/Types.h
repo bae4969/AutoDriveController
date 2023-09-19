@@ -5,6 +5,8 @@
 #include <pcl/point_cloud.h>
 
 namespace AutoDriveCode {
+	typedef std::chrono::steady_clock ClockType;
+
 	typedef pcl::PointXYZ PTType;
 	typedef pcl::PointNormal PTNType;
 	typedef pcl::PointXYZRGB PTLType;
@@ -39,7 +41,8 @@ namespace AutoDriveCode {
 		TYPE TarValue;
 		TYPE Speed;
 	};
-	struct MachineStateType {
+	class MachineStateType {
+	private:
 		std::mutex syncMutex;
 
 		MotorStateType<int> Rear;
@@ -50,47 +53,69 @@ namespace AutoDriveCode {
 		double SonicSensor = 0.0;
 		std::vector<int> FloorSensor = std::vector<int>(3, 0);
 
-		std::queue<std::chrono::steady_clock::time_point> FrameDateTime;
+		double MachineTemperature;
+		int MachineStateBits;
 
 
+		std::queue<ClockType::time_point> FrameDateTime;
+
+	public:
 		void Clone(MachineStateType& state);
 		void UpdateMoveMotorState(MotorStateType<int>& rear, MotorStateType<float>& steer);
 		void UpdateCameraMotorState(MotorStateType<float>& cameraPitch, MotorStateType<float>& cameraYaw);
 		void UpdateSensorState(double& sonicSensor, std::vector<int>& floorSensor);
+		void UpdateLcdState(double& temp, int& state);
 		void UpdateFPS();
 
 		MotorStateType<int> GetRear();
 		MotorStateType<float> GetSteer();
 		MotorStateType<float> GetCameraPitch();
 		MotorStateType<float> GetCameraYaw();
+		double GetSonicValue();
+		int GetFloorValue(int idx);
+		int GetFPS();
+		double GetTemperature();
+		int GetStateBits();
 	};
-	struct ImageStateType {
-		std::mutex syncMutex;
-
-		cv::Mat OriginImage;
-		cv::Mat StateImage;
-		cv::Mat FilterImage;
-		PTLCPtr PointCloud;
-
-
-		void UpdateOriginImage(cv::Mat& originImage);
-		void UpdateStateImage(cv::Mat& stateImage);
-		void UpdateFilterImage(cv::Mat& filterImage);
-		void UpdatePointCloud(PTLCPtr& pointCloud);
-
-		cv::Mat GetOriginImage();
-		cv::Mat GetStateImage();
-		cv::Mat GetFilterImage();
-		PTLCPtr GetPointCloud();
-	};
-
-	struct CameraCaliDataType {
+	struct CaliDataType {
 		int Margin;
 		double RollDegree;
 		cv::Size PointCloudSize;
 		PTCPtr PointOffsets;
 
 		void Init();
+	};
+
+	class DeltaImageType {
+	private:
+		std::mutex syncMutex;
+		ClockType::time_point Time = ClockType::time_point::min();
+
+		cv::Mat Image;
+		float PitchDegree;
+		float YawDegree;
+
+	public:
+		void Set(DeltaImageType& deltaImage);
+		void Set(cv::Mat img, float pitch, float yaw);
+		void Get(ClockType::time_point& time, cv::Mat& img, float& pitch, float& yaw);
+	};
+	class DeltaLidarPoint {
+	private:
+		std::mutex syncMutex;
+		ClockType::time_point Time = ClockType::time_point::min();
+
+		PTCPtr LidarPoints = NULL;
+
+	public:
+		void Set(PTCPtr pc);
+		void Get(ClockType::time_point& time, PTCPtr& pc);
+	};
+
+	class ConclusionType {
+	private:
+		std::mutex syncMutex;
+
 	};
 }
 

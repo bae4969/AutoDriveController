@@ -25,28 +25,53 @@ namespace AutoDriveCode {
 	}
 
 
-	void Switcher::Init(string pubAddress, string subAddress) {
+	void Switcher::Init(string pubAddress, string subAddress, void* pcWndHandle) {
 		m_isStop = false;
 		m_pubAddress = pubAddress;
 		m_subAddress = subAddress;
-		m_cameraCaliData.Init();
 
-		m_subThread = thread(&Switcher::subscribeThreadFunc, this);
-		m_pubThread = thread(&Switcher::publishThreadFunc, this);
-		m_updateConnectionThread = thread(&Switcher::updateConnectionThreadFunc, this);
-		m_updateStateThread = thread(&Switcher::updateStateThreadFunc, this);
-		m_updateImageThread = thread(&Switcher::updateImageThreadFunc, this);
+		m_caliData.Init();
 
-		m_isBusy = false;
+		if (!pcWndHandle)
+			m_viewer = NULL;
+		else {
+			vtkSmartPointer<vtkRenderer> renderer = vtkRenderer::New();
+			vtkSmartPointer<vtkRenderWindowInteractor> interActor = vtkRenderWindowInteractor::New();
+			vtkSmartPointer<vtkRenderWindow> window = vtkRenderWindow::New();
+			interActor->SetRenderWindow(window);
+			renderer->SetBackground(0, 0, 0);
+			window->AddRenderer(renderer);
+			window->SetParentId(pcWndHandle);
+			window->DoubleBufferOn();
+
+			pcl::visualization::PCLVisualizer::Ptr t_viewer(new pcl::visualization::PCLVisualizer(renderer, window, "Point Cloud Viewer"));
+			m_viewer = t_viewer;
+			m_viewer->initCameraParameters();
+			m_viewer->setCameraPosition(0, 0, 0, 0, 100, 0, 0, 0, 1);
+			//m_viewer->setCameraPosition(0, 0, 100, 0, 0, 0, 0, 1, 0);
+			m_viewer->setCameraClipDistances(1, 300);
+			m_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10);
+			m_viewer->addCube(-5, 5, -10, 0, -5, 0, 1.0, 1.0, 1.0, "Lidar Object");
+			m_viewer->addCube(-5, 5, -10, 0, -5, 0, 1.0, 1.0, 1.0, "Car Object");
+		}
+
+		m_subThread = make_shared<thread>(&Switcher::subscribeThreadFunc, this);
+		m_pubThread = make_shared<thread>(&Switcher::publishThreadFunc, this);
+		m_updateConnectionThread = make_shared<thread>(&Switcher::updateConnectionThreadFunc, this);
+		m_updateStateThread = make_shared<thread>(&Switcher::updateStateThreadFunc, this);
+		m_updateImageThread = make_shared<thread>(&Switcher::updateImageThreadFunc, this);
+		m_updateLidarThread = make_shared<thread>(&Switcher::updateLidarThreadFunc, this);
+		m_updateConclusionThread = make_shared<thread>(&Switcher::updateConclusionThreadFunc, this);
 	}
 	void Switcher::Release() {
 		m_isStop = true;
-		m_subThread.join();
-		m_pubThread.join();
-		m_updateConnectionThread.join();
-		m_updateStateThread.join();
-		m_updateImageThread.join();
-		m_updateViewerThread.join();
+		if (m_subThread) m_subThread->join();
+		if (m_pubThread) m_pubThread->join();
+		if (m_updateConnectionThread) m_updateConnectionThread->join();
+		if (m_updateStateThread) m_updateStateThread->join();
+		if (m_updateImageThread) m_updateImageThread->join();
+		if (m_updateLidarThread) m_updateLidarThread->join();
+		if (m_updateConclusionThread) m_updateConclusionThread->join();
 	}
 
 	void Switcher::subscribeThreadFunc() {
@@ -58,6 +83,8 @@ namespace AutoDriveCode {
 		subSocket.set(zmq::sockopt::subscribe, "STATE_MOVE_MOTOR");
 		subSocket.set(zmq::sockopt::subscribe, "STATE_CAMERA_MOTOR");
 		subSocket.set(zmq::sockopt::subscribe, "STATE_SENSOR");
+		subSocket.set(zmq::sockopt::subscribe, "STATE_LCD_DISPLAY");
+		subSocket.set(zmq::sockopt::subscribe, "STATE_LIDAR_SENSOR");
 		subSocket.set(zmq::sockopt::subscribe, "STATE_CAMERA_SENSOR");
 		subSocket.connect(m_pubAddress);
 
@@ -82,10 +109,20 @@ namespace AutoDriveCode {
 					m_queueState.push(msg);
 					m_queueStateMutex.unlock();
 				}
+				else if (topic == "STATE_LCD_DISPLAY" && msg->size() == 3) {
+					m_queueStateMutex.lock();
+					m_queueState.push(msg);
+					m_queueStateMutex.unlock();
+				}
+				else if (topic == "STATE_LIDAR_SENSOR" && msg->size() % 3 == 2) {
+					m_queueLidarMutex.lock();
+					m_queueLidar.push(msg);
+					m_queueLidarMutex.unlock();
+				}
 				else if (topic == "STATE_CAMERA_SENSOR" && msg->size() == 2) {
-					m_queueImageMutex.lock();
+					m_queueLidarMutex.lock();
 					m_queueImage.push(msg);
-					m_queueImageMutex.unlock();
+					m_queueLidarMutex.unlock();
 				}
 			}
 			catch (...) {}
@@ -118,7 +155,7 @@ namespace AutoDriveCode {
 	}
 	void Switcher::updateConnectionThreadFunc() {
 		while (!m_isStop) {
-			chrono::steady_clock::time_point start = chrono::steady_clock::now();
+			ClockType::time_point start = ClockType::now();
 
 			shared_ptr<zmq::multipart_t> msg(new zmq::multipart_t);
 			msg->addstr("COMMAND_PICAR");
@@ -127,7 +164,7 @@ namespace AutoDriveCode {
 			m_queueCmd.push(msg);
 			m_queueCmdMutex.unlock();
 
-			chrono::milliseconds sleepTime = chrono::duration_cast<chrono::milliseconds>(chrono::seconds(1) - (chrono::steady_clock::now() - start));
+			chrono::milliseconds sleepTime = chrono::duration_cast<chrono::milliseconds>(chrono::seconds(1) - (ClockType::now() - start));
 			while (!m_isStop && sleepTime.count() > 0) {
 				chrono::milliseconds t_sleepTime =
 					sleepTime.count() > 100 ?
@@ -180,6 +217,13 @@ namespace AutoDriveCode {
 					memcpy_s(&t_floorSensor[2], sizeof(t_floorSensor[2]), msg->at(3).data(), msg->at(3).size());
 					m_currentMachineState.UpdateSensorState(t_sonicSensor, t_floorSensor);
 				}
+				else if (topic == "STATE_LCD_DISPLAY") {
+					double t_temp;
+					int t_state;
+					memcpy_s(&t_temp, sizeof(t_temp), msg->at(0).data(), msg->at(0).size());
+					memcpy_s(&t_state, sizeof(t_state), msg->at(1).data(), msg->at(1).size());
+					m_currentMachineState.UpdateLcdState(t_temp, t_state);
+				}
 			}
 			catch (...) {}
 		}
@@ -199,150 +243,107 @@ namespace AutoDriveCode {
 				vector<char> recvData(data.size());
 				memcpy(recvData.data(), data.data(), data.size());
 
-				Mat originImage = imdecode(recvData, IMREAD_ANYCOLOR);
-
-				thread th(&Switcher::updatePipelineThreadFunc, this, originImage);
-				th.detach();
+				Mat img = imdecode(recvData, IMREAD_ANYCOLOR);
+				MachineStateType stateInfo;
+				m_currentMachineState.Clone(stateInfo);
+				Mat t_stateImg = ImageFilter::DrawStateInfoFilter(img, stateInfo);
+				m_currentCameraImage.Set(img, stateInfo.GetCameraPitch().CurValue, stateInfo.GetCameraYaw().CurValue);
+				m_stateImageMutex.lock();
+				m_stateImage = t_stateImg;
+				m_stateImageMutex.unlock();
 			}
 			catch (...) {}
 		}
 	}
-	void Switcher::updateViewerThreadFunc() {
-		float startPitch = -20.f;
-		float startYaw = -40.f;
-		float diffPitch = 20.f;
-		float diffYaw = 20.f;
-		int stepPitch = 4;
-		int stepYaw = 5;
-
-		vector<pair<float, float>> table;
-		for (int yIdx = 0; yIdx < stepPitch; yIdx++) {
-			for (int xIdx = 0; xIdx < stepYaw; xIdx++) {
-				int totIdx = yIdx * stepPitch + xIdx;
-
-				float pitchDegree = diffPitch * (yIdx - 1);
-				float yawDegree =
-					yIdx % 2 ?
-					diffYaw * (2 - xIdx) :
-					diffYaw * (xIdx - 2);
-
-				table.push_back(make_pair(pitchDegree, yawDegree));
-			}
-		}
-
-		SetCameraPitchValue(CMD_VALUE_TYPE_TARGET, startPitch);
-		SetCameraPitchValue(CMD_VALUE_TYPE_SPEED, 200);
-		SetCameraYawValue(CMD_VALUE_TYPE_TARGET, startYaw);
-		SetCameraYawValue(CMD_VALUE_TYPE_SPEED, 200);
-		this_thread::sleep_for(chrono::milliseconds(3000));
-
-		while (!m_isStop && !m_viewer->wasStopped())
-		{
-			for (int idx = 0; !m_isStop && idx < stepPitch * stepYaw; idx++) {
-				pair<float, float> t_value = table[idx];
-
-				string pcName = std::format("Point Cloud {:d}", idx);
-				float pitchDegree = t_value.first;
-				float yawDegree = t_value.second;
-
-				SetCameraPitchValue(CMD_VALUE_TYPE_TARGET, pitchDegree);
-				SetCameraYawValue(CMD_VALUE_TYPE_TARGET, yawDegree);
-				this_thread::sleep_for(chrono::milliseconds(500));
-
-				PTLCPtr pcPtr = m_currentCameraState.GetPointCloud();
-				if (pcPtr && !m_viewer->updatePointCloud(pcPtr, pcName))
-				{
-					m_viewer->addPointCloud(pcPtr, pcName);
+	void Switcher::updateLidarThreadFunc() {
+		while (!m_isStop) {
+			try {
+				bool isContinue = false;
+				shared_ptr<zmq::multipart_t> msg = TryDequeue(m_queueLidar, m_queueLidarMutex);
+				if (msg == NULL) {
+					this_thread::sleep_for(chrono::milliseconds(10));
+					continue;
 				}
 
-				m_viewer->spinOnce();
-				this_thread::sleep_for(chrono::milliseconds(66));
-			}
+				string topic = msg->popstr();
+				int len = msg->poptyp<int>();
+				if (len * 3 != msg->size())
+					continue;
 
-			for (int idx = stepPitch * stepYaw - 2; !m_isStop && idx > 0; idx--) {
-				pair<float, float> t_value = table[idx];
-
-				string pcName = std::format("Point Cloud {:d}", idx);
-				float pitchDegree = t_value.first;
-				float yawDegree = t_value.second;
-
-				SetCameraPitchValue(CMD_VALUE_TYPE_TARGET, pitchDegree);
-				SetCameraYawValue(CMD_VALUE_TYPE_TARGET, yawDegree);
-				this_thread::sleep_for(chrono::milliseconds(500));
-
-				PTLCPtr pcPtr = m_currentCameraState.GetPointCloud();
-				if (pcPtr && !m_viewer->updatePointCloud(pcPtr, pcName))
-				{
-					m_viewer->addPointCloud(pcPtr, pcName);
+				PTCPtr pcPtr(new PTCType());
+				for (int i = 0; i < len; i++) {
+					float degree = msg->poptyp<float>();
+					float radian = DEGREE_TO_RADIAN(degree);
+					float distance = msg->poptyp<float>() * 0.1;
+					float intensity = msg->poptyp<float>();
+					PTType t_pt;
+					t_pt.x = distance * sin(radian);
+					t_pt.y = distance * cos(radian);
+					t_pt.z = 6.f;
+					pcPtr->push_back(t_pt);
 				}
 
-				m_viewer->spinOnce();
-				this_thread::sleep_for(chrono::milliseconds(66));
+				m_targetLidarPoint.Set(pcPtr);
 			}
+			catch (...) {}
 		}
 	}
-	void Switcher::updatePipelineThreadFunc(Mat originImage) {
-		m_currentCameraState.UpdateOriginImage(originImage);
-		if (m_isBusy) return;
-		m_currentMachineState.UpdateFPS();
+	void Switcher::updateConclusionThreadFunc() {
+		ClockType::time_point last_image_time, last_lidar_time;
+		ClockType::time_point cur_image_time, cur_lidar_time;
+		last_image_time = last_lidar_time = ClockType::time_point::min();
 
-		m_pipelineMutex[0].lock();
-		m_isBusy = true;
+		Mat cur_Img;
+		float pitch_degree, yaw_degree;
+		PTCPtr cur_lidar;
 
-		MachineStateType stateInfo;
-		m_currentMachineState.Clone(stateInfo);
-		Mat stateImage = ImageFilter::DrawStateInfoFilter(originImage, stateInfo);
-		m_currentCameraState.UpdateStateImage(stateImage);
+		PCL_NEW(PTLCType, dst_image_pc);
+		PCL_NEW(PTCType, dst_lidar_pc);
 
-		m_isBusy = false;
-		m_pipelineMutex[1].lock();
-		m_pipelineMutex[0].unlock();
+		while (!m_isStop) {
+			auto start = ClockType::now();
 
-		Mat filterImage = ImageFilter::CalibrationCameraFilter(originImage, m_cameraCaliData);
-		m_currentCameraState.UpdateFilterImage(filterImage);
+			m_targetCameraImage.Get(cur_image_time, cur_Img, pitch_degree, yaw_degree);
+			m_targetLidarPoint.Get(cur_lidar_time, cur_lidar);
 
-		m_pipelineMutex[2].lock();
-		m_pipelineMutex[1].unlock();
+			if (!cur_Img.empty() && last_image_time != cur_image_time) {
+				last_image_time = cur_image_time;
+				dst_image_pc = ImageFilter::ConvertImageToPointCloud(
+					cur_Img,
+					m_caliData.Margin,
+					m_caliData.PointCloudSize,
+					m_caliData.PointOffsets,
+					pitch_degree,
+					yaw_degree
+				);
+			}
+			if (cur_lidar && last_lidar_time != cur_lidar_time) {
+				last_lidar_time = cur_lidar_time;
+				dst_lidar_pc = cur_lidar;
+			}
 
-		PTLCPtr pcPtr = ImageFilter::ConvertImageToPointCloud(originImage, m_cameraCaliData, stateInfo);
-		m_currentCameraState.UpdatePointCloud(pcPtr);
+			if (m_viewer && !m_viewer->wasStopped()) {
+				if (!m_viewer->updatePointCloud(dst_image_pc, "IMAGE_POINT"))
+					m_viewer->addPointCloud(dst_image_pc, "IMAGE_POINT");
+				if (!m_viewer->updatePointCloud(dst_lidar_pc, "LIDAR_POINT"))
+					m_viewer->addPointCloud(dst_lidar_pc, "LIDAR_POINT");
+				m_viewer->spinOnce();
+			}
 
-		m_pipelineMutex[2].unlock();
+			auto updateTime = chrono::duration_cast<chrono::milliseconds>(ClockType::now() - start).count();
+			if (updateTime < 66)
+				this_thread::sleep_for(chrono::milliseconds(66 - updateTime));
+		}
 	}
 
-	void Switcher::GetOriginImage(ImageData& imgData) {
-		Mat mat = m_currentCameraState.GetOriginImage();
-		imgData.Update(mat);
+	void Switcher::ExecuteEventCameraPointCloudCapture() {
+		m_targetCameraImage.Set(m_currentCameraImage);
 	}
+
 	void Switcher::GetStateImage(ImageData& imgData) {
-		Mat mat = m_currentCameraState.GetStateImage();
-		imgData.Update(mat);
-	}
-	void Switcher::GetFilterImage(ImageData& imgData) {
-		Mat mat = m_currentCameraState.GetFilterImage();
-		imgData.Update(mat);
-	}
-
-	void Switcher::SetPointCloudViwerWindow(void* handle) {
-		vtkSmartPointer<vtkRenderer> renderer = vtkRenderer::New();
-		vtkSmartPointer<vtkRenderWindowInteractor> interActor = vtkRenderWindowInteractor::New();
-		vtkSmartPointer<vtkRenderWindow> window = vtkRenderWindow::New();
-		interActor->SetRenderWindow(window);
-		renderer->SetBackground(0, 0, 0);
-		window->AddRenderer(renderer);
-		window->SetParentId(handle);
-		window->DoubleBufferOn();
-
-		pcl::visualization::PCLVisualizer::Ptr t_viewer(new pcl::visualization::PCLVisualizer(renderer, window, "Point Cloud Viewer"));
-		m_viewer = t_viewer;
-		m_viewer->initCameraParameters();
-		m_viewer->setCameraPosition(0, 0, 0, 0, 100, 0, 0, 0, 1);
-		//m_viewer->setCameraPosition(0, 0, 100, 0, 0, 0, 0, 1, 0);
-		m_viewer->setCameraClipDistances(1, 300);
-		m_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10);
-		m_viewer->addCube(-5, 5, -10, 0, -5, 0, 1.0, 1.0, 1.0, "Car Object");
-
-		m_updateViewerThread = thread(&Switcher::updateViewerThreadFunc, this);
+		m_stateImageMutex.lock();
+		imgData.Update(m_stateImage);
+		m_stateImageMutex.unlock();
 	}
 
 	void Switcher::TurnOff() {
@@ -425,7 +426,7 @@ namespace AutoDriveCode {
 			diff == 0 ?
 			0 :
 			m_currentMachineState.GetRear().CurValue + diff;
-		SetRearValue(CMD_VALUE_TYPE_TARGET, diff);
+		SetRearValue(CMD_VALUE_TYPE_TARGET, targetVal);
 	}
 	void Switcher::ChangeSteerValue(float diff) {
 		float targetVal =

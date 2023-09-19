@@ -22,7 +22,6 @@ namespace AutoDriveControlor.Forms
 		private object ImageLock = new();
 		private PictureBox? ZoomInPb = null;
 		private Bitmap? StateImage = null;
-		private Bitmap? FilterImage = null;
 
 		private void UpdateCameraViewThreadFunc()
 		{
@@ -31,15 +30,11 @@ namespace AutoDriveControlor.Forms
 				DateTime start = DateTime.Now;
 
 				Core.ImageData? stateData = Core.GetStateImage();
-				Core.ImageData? filterData = Core.GetFilterImage();
 				lock (ImageLock)
 				{
 					Bitmap? t_stateImage = StateImage;
-					Bitmap? t_filterImage = FilterImage;
 					StateImage = stateData?.ToBitmap();
-					FilterImage = filterData?.ToBitmap();
 					t_stateImage?.Dispose();
-					t_filterImage?.Dispose();
 				}
 				PB_ViewTL.Invalidate();
 				PB_ViewTR.Invalidate();
@@ -102,27 +97,12 @@ namespace AutoDriveControlor.Forms
 		}
 		private void PB_ViewTR_Paint(object sender, PaintEventArgs e)
 		{
-			lock (ImageLock)
-			{
-				if (FilterImage == null) return;
-				PictureBox targetPB = (PictureBox)sender;
-				RectangleF zommImgRect = PB_CAL.CalZoomImagePictureBoxRectangle(targetPB.ClientRectangle, FilterImage.Size);
-				e.Graphics.DrawImage(FilterImage, zommImgRect);
-			}
 		}
 		private void PB_ViewBL_Paint(object sender, PaintEventArgs e)
 		{
-			lock (ImageLock)
-			{
-
-			}
 		}
 		private void PB_ViewBR_Paint(object sender, PaintEventArgs e)
 		{
-			lock (ImageLock)
-			{
-
-			}
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,8 +280,7 @@ namespace AutoDriveControlor.Forms
 		}
 		private void AutoDriveControlor_Load(object sender, EventArgs e)
 		{
-			Core.Init(CONNECTION_STRINGS.EXTERN_SUB, CONNECTION_STRINGS.EXTERN_PUB);
-			Core.SetPointCloudViewerWindow(PB_ViewBL.Handle);
+			Core.Init(CONNECTION_STRINGS.EXTERN_SUB, CONNECTION_STRINGS.EXTERN_PUB, PB_ViewTR.Handle);
 			CameraViewTask = Task.Run(() => { UpdateCameraViewThreadFunc(); });
 			CommandTask = Task.Run(() => { UpdateCommandThreadFunc(); });
 		}
@@ -318,18 +297,13 @@ namespace AutoDriveControlor.Forms
 			this.Focus();
 		}
 
-		private void BTN_TSET_Click(object sender, EventArgs e)
-		{
-			lock (ImageLock)
-			{
-				StateImage?.Save("../../1_state.png");
-				FilterImage?.Save("../../2_filter.png");
-			}
-		}
-
-		private void BTN_ShowViewer_Click(object sender, EventArgs e)
+		private void BTN_FocusMainForm_Click(object sender, EventArgs e)
 		{
 			this.Focus();
+		}
+		private void BTN_Image2Pc_Click(object sender, EventArgs e)
+		{
+			Core.ExecuteEvent("CAMERA_PC_CAP");
 		}
 	}
 }

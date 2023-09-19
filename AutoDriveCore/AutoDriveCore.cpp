@@ -8,35 +8,28 @@ namespace AutoDriveCode {
 
 
 	Switcher g_Switcher;
-	ImageData g_OriginImage;
 	ImageData g_StateImage;
-	ImageData g_FilterImage;
 
 
-	void Init(char* pubAddress, char* subAddress) {
-		g_Switcher.Init(pubAddress, subAddress);
+	void Init(char* pubAddress, char* subAddress, void* handle) {
+		g_Switcher.Init(pubAddress, subAddress, handle);
 	}
 	void Release() {
 		g_Switcher.Release();
-		g_OriginImage.Release();
-		g_FilterImage.Release();
+		g_StateImage.Release();
 	}
 
-	ImageData GetOriginImage() {
-		g_Switcher.GetOriginImage(g_OriginImage);
-		return g_OriginImage;
-	}
 	ImageData GetStateImage() {
 		g_Switcher.GetStateImage(g_StateImage);
 		return g_StateImage;
 	}
-	ImageData GetFilterImage() {
-		g_Switcher.GetFilterImage(g_FilterImage);
-		return g_FilterImage;
-	}
 
-	void SetPointCloudViewerWindow(void* handle) {
-		g_Switcher.SetPointCloudViwerWindow(handle);
+	void ExecuteEvent(char* eventName) {
+		string eventStr = eventName;
+
+		if (eventStr == "CAMERA_PC_CAP") {
+			g_Switcher.ExecuteEventCameraPointCloudCapture();
+		}
 	}
 
 	void TurnOff() {

@@ -10,7 +10,7 @@ namespace AutoDriveCode {
 		using namespace cv;
 
 
-		Mat DrawStateInfoFilter(Mat& src, MachineStateType& stateInfo) {
+		Mat DrawStateInfoFilter(Mat src, MachineStateType& stateInfo) {
 			Mat dst = src.clone();
 			Size size = src.size();
 
@@ -19,40 +19,49 @@ namespace AutoDriveCode {
 			Scalar colorBlue(200, 0, 0);
 			Scalar colorRed(0, 0, 200);
 
-			int frameRate = stateInfo.FrameDateTime.size();
-			int speed = stateInfo.Rear.CurValue;
-			float steerDegree = stateInfo.Steer.CurValue;
-			float yawDegree = stateInfo.CameraYaw.CurValue;
-			float pitchDegree = stateInfo.CameraPitch.CurValue;
-			double distance = stateInfo.SonicSensor * 0.1;
-			double leftFloorVal = stateInfo.FloorSensor[0];
-			double centorFloorVal = stateInfo.FloorSensor[1];
-			double rightFloorVal = stateInfo.FloorSensor[2];
+			int frameRate = stateInfo.GetFPS();
+			double temp = stateInfo.GetTemperature();
+			int state = stateInfo.GetStateBits();
+			int speed = stateInfo.GetRear().CurValue;
+			float steerDegree = stateInfo.GetSteer().CurValue;
+			float yawDegree = stateInfo.GetCameraYaw().CurValue;
+			float pitchDegree = stateInfo.GetCameraPitch().CurValue;
+			double distance = stateInfo.GetSonicValue() * 0.1;
+			double leftFloorVal = stateInfo.GetFloorValue(0);
+			double centorFloorVal = stateInfo.GetFloorValue(1);
+			double rightFloorVal = stateInfo.GetFloorValue(2);
 
 			// 좌상단 숫자 정보
 			{
 				Point fpsStrLoc(20, 30);
-				Point speedStrLoc(20, 60);
-				Point steerStrLoc(20, 90);
-				Point camYawStrLoc(20, 120);
-				Point camPitchStrLoc(20, 150);
+				Point tempStrLoc(20, 60);
+				Point stateStrLoc(20, 90);
+				Point speedStrLoc(20, 120);
+				Point steerStrLoc(20, 150);
+				Point camYawStrLoc(20, 180);
+				Point camPitchStrLoc(20, 210);
+
 
 				string fpsStr = std::format("FPS : {:d}", frameRate);
+				string tempStr = std::format("Temp : {:.02f}", temp);
+				string stateStr = std::format("State : {:05x}", state);
 				string speedStr = std::format("Speed : {:d}", speed);
 				string steerStr = std::format("Steer : {:.01f}", steerDegree);
 				string camYawStr = std::format("Yaw : {:.01f}", yawDegree);
 				string camPitchStr = std::format("Pitch : {:.01f}", pitchDegree);
 
-				putText(dst, fpsStr, fpsStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
-				putText(dst, speedStr, speedStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
-				putText(dst, steerStr, steerStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
-				putText(dst, camYawStr, camYawStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
-				putText(dst, camPitchStr, camPitchStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
-				putText(dst, fpsStr, fpsStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
-				putText(dst, speedStr, speedStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
-				putText(dst, steerStr, steerStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
-				putText(dst, camYawStr, camYawStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
-				putText(dst, camPitchStr, camPitchStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
+				putText(dst, fpsStr, fpsStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorBlack, 10);
+				putText(dst, speedStr, speedStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorBlack, 10);
+				putText(dst, steerStr, steerStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorBlack, 10);
+				putText(dst, camYawStr, camYawStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorBlack, 10);
+				putText(dst, camPitchStr, camPitchStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorBlack, 10);
+				putText(dst, fpsStr, fpsStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
+				putText(dst, tempStr, tempStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
+				putText(dst, stateStr, stateStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
+				putText(dst, speedStr, speedStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
+				putText(dst, steerStr, steerStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
+				putText(dst, camYawStr, camYawStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
+				putText(dst, camPitchStr, camPitchStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
 			}
 
 			// 속도값
@@ -62,19 +71,17 @@ namespace AutoDriveCode {
 				int fgYOffset = size.height - 20 - layoutSize.height * 0.5;
 
 				Rect speedBGRect(20, bgYOffset, layoutSize.width, layoutSize.height);
-				Rect speedFGRect(20, fgYOffset, layoutSize.width, 0);
+				Rect speedFGRect(20, fgYOffset, layoutSize.width, abs(speed / 20.f));
 
 				rectangle(dst, speedBGRect, colorWhite, FILLED);
 				if (speed >= 0)
 				{
-					speedFGRect.height = abs(speed * 0.02);
 					speedFGRect.y = fgYOffset - speedFGRect.height;
 					rectangle(dst, speedFGRect, colorRed, FILLED);
 				}
 				else
 				{
 					speedFGRect.y = fgYOffset;
-					speedFGRect.height = abs(speed * 0.02);
 					rectangle(dst, speedFGRect, colorBlue, FILLED);
 				}
 			}
@@ -115,15 +122,15 @@ namespace AutoDriveCode {
 
 				int baseline = 0;
 				string distanceStr = std::format("{:05.02f}cm", distance);
-				Size bgSize = getTextSize(distanceStr, FONT_HERSHEY_SIMPLEX, 0.8, 10, &baseline);
-				Size fgSize = getTextSize(distanceStr, FONT_HERSHEY_SIMPLEX, 0.8, 3, &baseline);
+				Size bgSize = getTextSize(distanceStr, FONT_HERSHEY_DUPLEX, 0.8, 10, &baseline);
+				Size fgSize = getTextSize(distanceStr, FONT_HERSHEY_DUPLEX, 0.8, 3, &baseline);
 				Point bgStrLoc = distanceStrLoc;
 				Point fgStrLoc = distanceStrLoc;
 				bgStrLoc.x -= bgSize.width * 0.5 - 8;
 				fgStrLoc.x -= fgSize.width * 0.5 - 5;
 
-				putText(dst, distanceStr, bgStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorBlack, 10);
-				putText(dst, distanceStr, fgStrLoc, FONT_HERSHEY_SIMPLEX, 0.8, colorWhite, 3);
+				putText(dst, distanceStr, bgStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorBlack, 10);
+				putText(dst, distanceStr, fgStrLoc, FONT_HERSHEY_DUPLEX, 0.8, colorWhite, 3);
 			}
 
 			// 하단 센서값
@@ -154,23 +161,21 @@ namespace AutoDriveCode {
 
 			return dst;
 		}
-		Mat CalibrationCameraFilter(Mat& src, CameraCaliDataType& caliData) {
+		Mat CalibrationCameraFilter(Mat src, int margin, double rotDeg) {
 			Mat dst = src;
 			Size srcSize = src.size();
 
 			// 외각에 생기는 bad pixel 자르기
 			{
-				int margin = caliData.Margin;
 				Rect edgeCut(margin, margin, src.cols - margin * 2, src.rows - margin * 2);
 				dst = dst(edgeCut).clone();
 				srcSize = dst.size();
 			}
 
 			// 회전 및 빈공간 자르기
-			if(false) {
-				double rotDegree = caliData.RollDegree;
+			{
 				Point2f rotCenter(srcSize.width * 0.5, srcSize.height * 0.5);
-				Mat rotMat = getRotationMatrix2D(rotCenter, rotDegree, 1.0);
+				Mat rotMat = getRotationMatrix2D(rotCenter, rotDeg, 1.0);
 				warpAffine(dst, dst, rotMat, Size(), INTER_LINEAR);
 
 				Point2d rb(srcSize.width, srcSize.height);
@@ -194,37 +199,39 @@ namespace AutoDriveCode {
 
 			return dst;
 		}
-		PTLCPtr ConvertImageToPointCloud(Mat& src, CameraCaliDataType& caliData, MachineStateType& stateInfo) {
-			Mat t_src;
 
+		////////////////////////////////////////////////////////////////////////////////
+
+		PTLCPtr ConvertImageToPointCloud(Mat src, int margin, Size resizedSize, PTCPtr caliOffset, float pitchDeg, float yawDeg) {
 			// 외각에 생기는 bad pixel 자르기
+			Mat cutImg;
 			{
-				int margin = caliData.Margin;
 				Rect edgeCut(margin, margin, src.cols - margin * 2, src.rows - margin * 2);
-				t_src = src(edgeCut).clone();
+				cutImg = src(edgeCut);
 			}
 
-			Size srcSize = caliData.PointCloudSize;
-			resize(t_src, t_src, srcSize);
+			Mat resizedImg;
+			{
+				resize(cutImg, resizedImg, resizedSize);
+			}
 
 			float imgXDistanceRate = 1.0f;
 			float imgYDistanceRate = 0.7f;
 
 			float distance = 100.f;
-			float x_scale = imgXDistanceRate / srcSize.width * distance;
-			float z_scale = imgYDistanceRate / srcSize.height * distance;
-			float x_offset = -srcSize.width * 0.5f;
-			float z_offset = -srcSize.height * 0.5f;
+			float x_scale = imgXDistanceRate / resizedSize.width * distance;
+			float z_scale = imgYDistanceRate / resizedSize.height * distance;
+			float x_offset = -resizedSize.width * 0.5f;
+			float z_offset = -resizedSize.height * 0.5f;
 
-			PTCPtr offsetPc = caliData.PointOffsets;
 			PCL_NEW(PTLCType, srcPc);
-			srcPc->resize(srcSize.area());
-			for (int y = 0; y < srcSize.height; y++) {
-				for (int x = 0; x < srcSize.width; x++) {
-					size_t idx = y * srcSize.width + x;
-					PTType& offset = offsetPc->at(idx);
+			srcPc->resize(resizedSize.area());
+			for (int y = 0; y < resizedSize.height; y++) {
+				for (int x = 0; x < resizedSize.width; x++) {
+					size_t idx = y * resizedSize.width + x;
+					PTType& offset = caliOffset->at(idx);
 					PTLType& pt = srcPc->at(idx);
-					Vec3b& pxl = t_src.at<Vec3b>(idx);
+					Vec3b& pxl = resizedImg.at<Vec3b>(idx);
 					pt.x = offset.x;
 					pt.y = offset.y;
 					pt.z = offset.z;
@@ -235,10 +242,10 @@ namespace AutoDriveCode {
 				}
 			}
 
-			Eigen::AngleAxisd roll(DEGREE_TO_RADIAN(caliData.RollDegree), -Eigen::Vector3d::UnitY());
-			Eigen::AngleAxisd yaw(DEGREE_TO_RADIAN(stateInfo.CameraYaw.CurValue), -Eigen::Vector3d::UnitZ());
-			Eigen::AngleAxisd pitch(DEGREE_TO_RADIAN(stateInfo.CameraPitch.CurValue), Eigen::Vector3d::UnitX());
-			Eigen::Matrix3d rotationMatrix = (roll * yaw * pitch).matrix();
+			Eigen::AngleAxisd yaw(DEGREE_TO_RADIAN(yawDeg), -Eigen::Vector3d::UnitZ());
+			Eigen::AngleAxisd pitch(DEGREE_TO_RADIAN(pitchDeg), Eigen::Vector3d::UnitX());
+			//Eigen::AngleAxisd roll(DEGREE_TO_RADIAN(caliData.RollDegree), -Eigen::Vector3d::UnitY());
+			Eigen::Matrix3d rotationMatrix = (yaw * pitch).matrix();
 
 			Eigen::Matrix4f transMat = Eigen::Matrix4f::Identity();
 			for (int i = 0; i < 3; i++)for (int j = 0; j < 3; j++)

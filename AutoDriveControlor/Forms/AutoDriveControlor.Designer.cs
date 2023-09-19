@@ -34,8 +34,8 @@
 			PB_ViewBR = new PictureBox();
 			TLP_ViewLayoutTable = new TableLayoutPanel();
 			SC_ViewAndControl = new SplitContainer();
-			BTN_TSET = new Button();
-			BTN_ShowViewer = new Button();
+			BTN_Image2Pc = new Button();
+			BTN_FocusMainForm = new Button();
 			((System.ComponentModel.ISupportInitialize)PB_ViewTL).BeginInit();
 			((System.ComponentModel.ISupportInitialize)PB_ViewTR).BeginInit();
 			((System.ComponentModel.ISupportInitialize)PB_ViewBL).BeginInit();
@@ -135,31 +135,32 @@
 			// 
 			// SC_ViewAndControl.Panel2
 			// 
-			SC_ViewAndControl.Panel2.Controls.Add(BTN_ShowViewer);
-			SC_ViewAndControl.Panel2.Controls.Add(BTN_TSET);
+			SC_ViewAndControl.Panel2.Controls.Add(BTN_Image2Pc);
+			SC_ViewAndControl.Panel2.Controls.Add(BTN_FocusMainForm);
 			SC_ViewAndControl.Size = new Size(1184, 761);
 			SC_ViewAndControl.SplitterDistance = 969;
 			SC_ViewAndControl.TabIndex = 19;
 			// 
-			// BTN_TSET
+			// BTN_Image2Pc
 			// 
-			BTN_TSET.Location = new Point(28, 33);
-			BTN_TSET.Name = "BTN_TSET";
-			BTN_TSET.Size = new Size(75, 23);
-			BTN_TSET.TabIndex = 0;
-			BTN_TSET.Text = "test";
-			BTN_TSET.UseVisualStyleBackColor = true;
-			BTN_TSET.Click += BTN_TSET_Click;
+			BTN_Image2Pc.Location = new Point(3, 50);
+			BTN_Image2Pc.Name = "BTN_Image2Pc";
+			BTN_Image2Pc.Size = new Size(94, 35);
+			BTN_Image2Pc.TabIndex = 3;
+			BTN_Image2Pc.Text = "Capture";
+			BTN_Image2Pc.UseVisualStyleBackColor = true;
+			BTN_Image2Pc.Click += BTN_Image2Pc_Click;
 			// 
-			// BTN_ShowViewer
+			// BTN_FocusMainForm
 			// 
-			BTN_ShowViewer.Location = new Point(47, 517);
-			BTN_ShowViewer.Name = "BTN_ShowViewer";
-			BTN_ShowViewer.Size = new Size(115, 33);
-			BTN_ShowViewer.TabIndex = 1;
-			BTN_ShowViewer.Text = "Show Viewer";
-			BTN_ShowViewer.UseVisualStyleBackColor = true;
-			BTN_ShowViewer.Click += BTN_ShowViewer_Click;
+			BTN_FocusMainForm.Font = new Font("Arial Black", 14.25F, FontStyle.Bold, GraphicsUnit.Point);
+			BTN_FocusMainForm.Location = new Point(3, 3);
+			BTN_FocusMainForm.Name = "BTN_FocusMainForm";
+			BTN_FocusMainForm.Size = new Size(205, 41);
+			BTN_FocusMainForm.TabIndex = 2;
+			BTN_FocusMainForm.Text = "To control Mode";
+			BTN_FocusMainForm.UseVisualStyleBackColor = true;
+			BTN_FocusMainForm.Click += BTN_FocusMainForm_Click;
 			// 
 			// AutoDriveControlor
 			// 
@@ -211,7 +212,7 @@
 		private TableLayoutPanel tableLayoutPanel2;
 		private TableLayoutPanel TLP_ViewLayoutTable;
 		private SplitContainer SC_ViewAndControl;
-		private Button BTN_TSET;
-		private Button BTN_ShowViewer;
+		private Button BTN_FocusMainForm;
+		private Button BTN_Image2Pc;
 	}
 }
