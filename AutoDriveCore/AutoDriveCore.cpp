@@ -27,8 +27,14 @@ namespace AutoDriveCode {
 	void ExecuteEvent(char* eventName) {
 		string eventStr = eventName;
 
-		if (eventStr == "CAMERA_PC_CAP") {
-			g_Switcher.ExecuteEventCameraPointCloudCapture();
+		if (eventStr == "RESIZE_VISUALIZER") {
+			g_Switcher.ExecuteEventResizeVisualizer();
+		}
+		else if (eventStr == "PUSH_IMAGE_PC") {
+			g_Switcher.ExecuteEventPushImagePointCloud();
+		}
+		else if (eventStr == "POP_ALL_IMAGE_PC") {
+			g_Switcher.ExecuteEventPopAllImagePointCloud();
 		}
 	}
 

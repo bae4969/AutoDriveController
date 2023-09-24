@@ -1,13 +1,14 @@
 #include "pch.h"
 #include "Switcher.h"
-#include "ImageFilter.h"
+#include "MachineDebugImageFilter.h"
+#include "ImageToPointCloudFilter.h"
 
 namespace AutoDriveCode {
 	using namespace std;
 	using namespace cv;
 
 
-	shared_ptr<zmq::multipart_t> TryDequeue(queue<shared_ptr<zmq::multipart_t>>& queue, mutex& mutex, size_t hwm = 0) {
+	shared_ptr<zmq::multipart_t> TryDequeueMassage(queue<shared_ptr<zmq::multipart_t>>& queue, mutex& mutex, size_t hwm = 0) {
 		shared_ptr<zmq::multipart_t> msg = NULL;
 
 		mutex.lock();
@@ -30,8 +31,6 @@ namespace AutoDriveCode {
 		m_pubAddress = pubAddress;
 		m_subAddress = subAddress;
 
-		m_caliData.Init();
-
 		if (!pcWndHandle)
 			m_viewer = NULL;
 		else {
@@ -39,7 +38,7 @@ namespace AutoDriveCode {
 			vtkSmartPointer<vtkRenderWindowInteractor> interActor = vtkRenderWindowInteractor::New();
 			vtkSmartPointer<vtkRenderWindow> window = vtkRenderWindow::New();
 			interActor->SetRenderWindow(window);
-			renderer->SetBackground(0, 0, 0);
+			renderer->SetBackground(0.25, 0.25, 0.25);
 			window->AddRenderer(renderer);
 			window->SetParentId(pcWndHandle);
 			window->DoubleBufferOn();
@@ -47,12 +46,14 @@ namespace AutoDriveCode {
 			pcl::visualization::PCLVisualizer::Ptr t_viewer(new pcl::visualization::PCLVisualizer(renderer, window, "Point Cloud Viewer"));
 			m_viewer = t_viewer;
 			m_viewer->initCameraParameters();
-			m_viewer->setCameraPosition(0, 0, 0, 0, 100, 0, 0, 0, 1);
-			//m_viewer->setCameraPosition(0, 0, 100, 0, 0, 0, 0, 1, 0);
-			m_viewer->setCameraClipDistances(1, 300);
-			m_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10);
-			m_viewer->addCube(-5, 5, -10, 0, -5, 0, 1.0, 1.0, 1.0, "Lidar Object");
-			m_viewer->addCube(-5, 5, -10, 0, -5, 0, 1.0, 1.0, 1.0, "Car Object");
+			//m_viewer->setCameraPosition(0, 0, 0, 0, 100, 0, 0, 0, 1);
+			m_viewer->setCameraPosition(0, -1000, 500, 0, 0, 0, 0, 0.666, 0.333);
+			m_viewer->setCameraClipDistances(1, 3000);
+			m_viewer->addCube(-30, 30, -35, 35, -30, 60, 1.0, 1.0, 1.0, "Core Object");
+			m_viewer->addCube(-65, 65, -50, 160, -110, -30, 1.0, 1.0, 1.0, "Body Object");
+			m_viewer->addCube(-20, 20, 110, 150, -20, 20, 1.0, 1.0, 1.0, "Camera Object");
+			m_viewer->addCube(-15, 15, -15, 15, 60, 90, 1.0, 1.0, 1.0, "Lidar Object");
+			ExecuteEventResizeVisualizer();
 		}
 
 		m_subThread = make_shared<thread>(&Switcher::subscribeThreadFunc, this);
@@ -140,7 +141,7 @@ namespace AutoDriveCode {
 		while (!m_isStop) {
 			try {
 				bool isContinue = false;
-				shared_ptr<zmq::multipart_t> msg = TryDequeue(m_queueCmd, m_queueCmdMutex, 4);
+				shared_ptr<zmq::multipart_t> msg = TryDequeueMassage(m_queueCmd, m_queueCmdMutex, 4);
 				if (msg == NULL) {
 					this_thread::sleep_for(chrono::milliseconds(10));
 					continue;
@@ -179,7 +180,7 @@ namespace AutoDriveCode {
 		while (!m_isStop) {
 			try {
 				bool isContinue = false;
-				shared_ptr<zmq::multipart_t> msg = TryDequeue(m_queueState, m_queueStateMutex, 4);
+				shared_ptr<zmq::multipart_t> msg = TryDequeueMassage(m_queueState, m_queueStateMutex, 4);
 				if (msg == NULL) {
 					this_thread::sleep_for(chrono::milliseconds(10));
 					continue;
@@ -229,10 +230,23 @@ namespace AutoDriveCode {
 		}
 	}
 	void Switcher::updateImageThreadFunc() {
+		Modules::MachineDebugImageFilterType machineDebugImageFilter;
+		machineDebugImageFilter.SetInplace(false);
+
+		Modules::ImageToPointCloudFilterType imageToPointCloudFilter;
+		imageToPointCloudFilter.SetMargin(CAMERA_EDGE_BAD_PIXEL_MARGIN);
+		imageToPointCloudFilter.SetScale(IMAGE_TO_POINT_SIZE_RATE);
+		imageToPointCloudFilter.SetDefaultDistance(IMAGE_POINT_DEFAULT_DISTANCE);
+		imageToPointCloudFilter.SetOffsetDistance(CAMERA_TO_YAW_AXIS_Y_OFFSET);
+		imageToPointCloudFilter.SetWidthMPPInOneMmDistance(CAMERA_WIDTH_MPP_IN_ONE_MM_DISTANCE);
+		imageToPointCloudFilter.SetHeightMPPInOneMmDistance(CAMERA_HEIGHT_MPP_IN_ONE_MM_DISTANCE);
+		imageToPointCloudFilter.SetRollDegree(CAMERA_ROLL_DEGREE);
+		imageToPointCloudFilter.SetCenterY(YAW_AXIS_TO_CENTER_Y_OFFSET);
+
 		while (!m_isStop) {
 			try {
 				bool isContinue = false;
-				shared_ptr<zmq::multipart_t> msg = TryDequeue(m_queueImage, m_queueImageMutex);
+				shared_ptr<zmq::multipart_t> msg = TryDequeueMassage(m_queueImage, m_queueImageMutex);
 				if (msg == NULL) {
 					this_thread::sleep_for(chrono::milliseconds(10));
 					continue;
@@ -244,13 +258,17 @@ namespace AutoDriveCode {
 				memcpy(recvData.data(), data.data(), data.size());
 
 				Mat img = imdecode(recvData, IMREAD_ANYCOLOR);
-				MachineStateType stateInfo;
-				m_currentMachineState.Clone(stateInfo);
-				Mat t_stateImg = ImageFilter::DrawStateInfoFilter(img, stateInfo);
-				m_currentCameraImage.Set(img, stateInfo.GetCameraPitch().CurValue, stateInfo.GetCameraYaw().CurValue);
-				m_stateImageMutex.lock();
-				m_stateImage = t_stateImg;
-				m_stateImageMutex.unlock();
+				machineDebugImageFilter.SetWithMachineState(m_currentMachineState);
+				machineDebugImageFilter.SetInputImage(img);
+				machineDebugImageFilter.Update();
+
+				imageToPointCloudFilter.SetInputImage(img);
+				imageToPointCloudFilter.SetPitchDegree(machineDebugImageFilter.GetCameraPitchDegree());
+				imageToPointCloudFilter.SetYawDegree(machineDebugImageFilter.GetCameraYawDegree());
+				imageToPointCloudFilter.Update();
+
+				m_currentStateImage.Set(machineDebugImageFilter.GetOutputImage());
+				m_currentImagePc.Set(imageToPointCloudFilter.GetOutputPointCloud());
 			}
 			catch (...) {}
 		}
@@ -259,7 +277,7 @@ namespace AutoDriveCode {
 		while (!m_isStop) {
 			try {
 				bool isContinue = false;
-				shared_ptr<zmq::multipart_t> msg = TryDequeue(m_queueLidar, m_queueLidarMutex);
+				shared_ptr<zmq::multipart_t> msg = TryDequeueMassage(m_queueLidar, m_queueLidarMutex);
 				if (msg == NULL) {
 					this_thread::sleep_for(chrono::milliseconds(10));
 					continue;
@@ -270,80 +288,137 @@ namespace AutoDriveCode {
 				if (len * 3 != msg->size())
 					continue;
 
-				PTCPtr pcPtr(new PTCType());
+				PTNCPtr pcPtr(new PTNCType());
 				for (int i = 0; i < len; i++) {
-					float degree = msg->poptyp<float>();
+					float degree = msg->poptyp<float>() + LIDAR_DEGREE_OFFSET;
 					float radian = DEGREE_TO_RADIAN(degree);
-					float distance = msg->poptyp<float>() * 0.1;
+					float distance = msg->poptyp<float>();
 					float intensity = msg->poptyp<float>();
-					PTType t_pt;
-					t_pt.x = distance * sin(radian);
-					t_pt.y = distance * cos(radian);
-					t_pt.z = 6.f;
+					PTNType t_pt;
+					t_pt.normal_x = sin(radian);
+					t_pt.normal_y = cos(radian);
+					t_pt.normal_z = 0.0;
+					t_pt.curvature = 0.0;
+					t_pt.x = distance * t_pt.normal_x;
+					t_pt.y = distance * t_pt.normal_y;
+					t_pt.z = LIDAR_HEIGHT_OFFSET;
 					pcPtr->push_back(t_pt);
 				}
 
-				m_targetLidarPoint.Set(pcPtr);
+				m_currentLidarPc.Set(pcPtr);
 			}
 			catch (...) {}
 		}
 	}
 	void Switcher::updateConclusionThreadFunc() {
-		ClockType::time_point last_image_time, last_lidar_time;
-		ClockType::time_point cur_image_time, cur_lidar_time;
-		last_image_time = last_lidar_time = ClockType::time_point::min();
+		TimePointType last_image_time, last_lidar_time;
+		TimePointType cur_image_time, cur_lidar_time;
+		last_image_time = last_lidar_time = TimePointType::min();
 
-		Mat cur_Img;
-		float pitch_degree, yaw_degree;
-		PTCPtr cur_lidar;
+		PTLNCPtr src_Image;
+		PTNCPtr src_lidar;
 
-		PCL_NEW(PTLCType, dst_image_pc);
-		PCL_NEW(PTCType, dst_lidar_pc);
+		Eigen::Matrix4f delta_trans;
+
+		PCL_NEW(PTLNCType, dst_image);
+		PCL_NEW(PTNCType, dst_lidar);
 
 		while (!m_isStop) {
 			auto start = ClockType::now();
 
-			m_targetCameraImage.Get(cur_image_time, cur_Img, pitch_degree, yaw_degree);
-			m_targetLidarPoint.Get(cur_lidar_time, cur_lidar);
+			m_srcCameraPc.Get(cur_image_time, src_Image);
+			// TODO
+			//m_srcLidarPc.Get(cur_lidar_time, src_lidar);
+			m_currentLidarPc.Get(cur_lidar_time, src_lidar);
 
-			if (!cur_Img.empty() && last_image_time != cur_image_time) {
-				last_image_time = cur_image_time;
-				dst_image_pc = ImageFilter::ConvertImageToPointCloud(
-					cur_Img,
-					m_caliData.Margin,
-					m_caliData.PointCloudSize,
-					m_caliData.PointOffsets,
-					pitch_degree,
-					yaw_degree
-				);
-			}
-			if (cur_lidar && last_lidar_time != cur_lidar_time) {
+			delta_trans.setIdentity();
+			if (src_lidar && last_lidar_time != cur_lidar_time) {
 				last_lidar_time = cur_lidar_time;
-				dst_lidar_pc = cur_lidar;
+				dst_lidar = src_lidar;
+			}
+			if (src_Image && last_image_time != cur_image_time) {
+				last_image_time = cur_image_time;
+				dst_image = src_Image;
 			}
 
 			if (m_viewer && !m_viewer->wasStopped()) {
-				if (!m_viewer->updatePointCloud(dst_image_pc, "IMAGE_POINT"))
-					m_viewer->addPointCloud(dst_image_pc, "IMAGE_POINT");
-				if (!m_viewer->updatePointCloud(dst_lidar_pc, "LIDAR_POINT"))
-					m_viewer->addPointCloud(dst_lidar_pc, "LIDAR_POINT");
-				m_viewer->spinOnce();
+				PCL_NEW(PTLCType, viewer_image_pc);
+				PCL_NEW(PTCType, viewer_lidar_pc);
+				copyPointCloud<PTLNType, PTLType>(*dst_image, *viewer_image_pc);
+				copyPointCloud<PTNType, PTType>(*dst_lidar, *viewer_lidar_pc);
+				if (!m_viewer->updatePointCloud(viewer_image_pc, "IMAGE_POINT")) {
+					m_viewer->addPointCloud(viewer_image_pc, "IMAGE_POINT");
+					m_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "IMAGE_POINT");
+				}
+				if (!m_viewer->updatePointCloud(viewer_lidar_pc, "LIDAR_POINT")) {
+					m_viewer->addPointCloud(viewer_lidar_pc, "LIDAR_POINT");
+					m_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LIDAR_POINT");
+				}
 			}
 
 			auto updateTime = chrono::duration_cast<chrono::milliseconds>(ClockType::now() - start).count();
+			if (m_viewer && !m_viewer->wasStopped())
+				m_viewer->spinOnce(updateTime);
 			if (updateTime < 66)
 				this_thread::sleep_for(chrono::milliseconds(66 - updateTime));
 		}
 	}
 
-	void Switcher::ExecuteEventCameraPointCloudCapture() {
-		m_targetCameraImage.Set(m_currentCameraImage);
-	}
-
 	void Switcher::GetStateImage(ImageData& imgData) {
-		m_stateImageMutex.lock();
-		imgData.Update(m_stateImage);
-		m_stateImageMutex.unlock();
+		TimePointType tp;
+		Mat img;
+		m_currentStateImage.Get(tp, img);
+		imgData.Update(img);
+	}
+	void Switcher::ExecuteEventResizeVisualizer() {
+		if (!m_viewer) return;
+
+		auto renderWindow = m_viewer->getRenderWindow();
+		RECT rect;
+		GetWindowRect((HWND)renderWindow->GetGenericParentId(), &rect);
+		renderWindow->SetSize(rect.right - rect.left, rect.bottom - rect.top);
+	}
+	void Switcher::ExecuteEventPushImagePointCloud() {
+		TimePointType tp;
+		PTLNCPtr pc;
+		m_currentImagePc.Get(tp, pc);
+		if (!pc || pc->size() == 0) return;
+
+		m_imagePcBuffer.push(pc);
+	}
+	void Switcher::ExecuteEventPopAllImagePointCloud() {
+		using IcpFilterType = pcl::IterativeClosestPointWithNormals<PTLNType, PTLNType>;
+		//using IcpFilterType = pcl::GeneralizedIterativeClosestPoint<PTLNType, PTLNType>;
+		using DownSampleFilterType = pcl::VoxelGrid<PTLNType>;
+
+		double rate = CAMERA_WIDTH_MPP_IN_ONE_MM_DISTANCE * IMAGE_POINT_DEFAULT_DISTANCE / IMAGE_TO_POINT_SIZE_RATE;
+		IcpFilterType icpFilter;
+		DownSampleFilterType downSampleFilter;
+		icpFilter.setMaxCorrespondenceDistance(rate * 100);
+		downSampleFilter.setLeafSize(rate * 2, rate * 2, rate * 2);
+
+		PCL_NEW(PTLNCType, dst);
+		if (m_imagePcBuffer.size() == 1) {
+			dst = m_imagePcBuffer.front();
+			m_imagePcBuffer.pop();
+		}
+		else if (m_imagePcBuffer.size() > 1) {
+			PTLNCPtr src1, src2;
+			PCL_NEW(PTLNCType, src3);
+			src1 = m_imagePcBuffer.front();
+			m_imagePcBuffer.pop();
+			while (m_imagePcBuffer.size() > 0) {
+				src2 = m_imagePcBuffer.front();
+				m_imagePcBuffer.pop();
+				icpFilter.setInputSource(src2);
+				icpFilter.setInputTarget(src1);
+				icpFilter.align(*src3);
+				*src1 = (*src1) + (*src3);
+			}
+			downSampleFilter.setInputCloud(src1);
+			downSampleFilter.filter(*dst);
+		}
+		m_srcCameraPc.Set(dst);
 	}
 
 	void Switcher::TurnOff() {

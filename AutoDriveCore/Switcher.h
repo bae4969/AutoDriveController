@@ -34,14 +34,14 @@ namespace AutoDriveCode {
 		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueLidar;
 		std::queue<std::shared_ptr<zmq::multipart_t>> m_queueImage;
 
-		std::mutex m_stateImageMutex;
-		cv::Mat m_stateImage;
-		DeltaImageType m_currentCameraImage;
 		MachineStateType m_currentMachineState;
-		CaliDataType m_caliData;
+		DeltaType<cv::Mat> m_currentStateImage;
+		DeltaType<PTLNCPtr> m_currentImagePc;
+		DeltaType<PTNCPtr> m_currentLidarPc;
 
-		DeltaImageType m_targetCameraImage;
-		DeltaLidarPoint m_targetLidarPoint;
+		std::queue<PTLNCPtr> m_imagePcBuffer;
+		DeltaType<PTLNCPtr> m_srcCameraPc;
+		DeltaType<PTNCPtr> m_srcLidarPc;
 
 
 		void subscribeThreadFunc();
@@ -56,9 +56,11 @@ namespace AutoDriveCode {
 		void Init(std::string pubAddress, std::string subAddress, void* pcWndHandle);
 		void Release();
 
-		void ExecuteEventCameraPointCloudCapture();
-
 		void GetStateImage(ImageData& imgData);
+		void ExecuteEventResizeVisualizer();
+		void ExecuteEventPushImagePointCloud();
+		void ExecuteEventPopAllImagePointCloud();
+
 
 		void TurnOff();
 		void StopMove();

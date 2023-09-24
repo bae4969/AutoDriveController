@@ -20,7 +20,7 @@ namespace AutoDriveControlor.Forms
 		private bool IsStopToUpdateCamera = false;
 		private Task? CameraViewTask = null;
 		private object ImageLock = new();
-		private PictureBox? ZoomInPb = null;
+		private bool IsZoomIn = false;
 		private Bitmap? StateImage = null;
 
 		private void UpdateCameraViewThreadFunc()
@@ -36,56 +36,15 @@ namespace AutoDriveControlor.Forms
 					StateImage = stateData?.ToBitmap();
 					t_stateImage?.Dispose();
 				}
-				PB_ViewTL.Invalidate();
-				PB_ViewTR.Invalidate();
+				PB_ViewImage.Invalidate();
+				PB_ViewVisualizer.Invalidate();
 
 				if ((TimeSpan.FromMilliseconds(33) - (DateTime.Now - start)).Milliseconds > 0)
 					Thread.Sleep(TimeSpan.FromMilliseconds(33) - (DateTime.Now - start));
 			}
 		}
 
-		private void PB_DoubleClickEvent(object sender, EventArgs e)
-		{
-			PictureBox pb = (PictureBox)sender;
-			if (ZoomInPb == null)
-				ZoomInPb = pb;
-			else if (ZoomInPb == pb)
-				ZoomInPb = null;
-			else
-				ZoomInPb = pb;
-
-
-			if (ZoomInPb == PB_ViewTL || ZoomInPb == PB_ViewTR)
-			{
-				TLP_ViewLayoutTable.RowStyles[0].Height = TLP_ViewLayoutTable.Height;
-				TLP_ViewLayoutTable.RowStyles[1].Height = 0;
-			}
-			else if (ZoomInPb == PB_ViewBL || ZoomInPb == PB_ViewBR)
-			{
-				TLP_ViewLayoutTable.RowStyles[0].Height = 0;
-				TLP_ViewLayoutTable.RowStyles[1].Height = TLP_ViewLayoutTable.Height;
-			}
-			else
-			{
-				TLP_ViewLayoutTable.RowStyles[0].Height = TLP_ViewLayoutTable.RowStyles[1].Height = TLP_ViewLayoutTable.Height * 0.5f;
-			}
-
-			if (ZoomInPb == PB_ViewTL || ZoomInPb == PB_ViewBL)
-			{
-				TLP_ViewLayoutTable.ColumnStyles[0].Width = TLP_ViewLayoutTable.Width;
-				TLP_ViewLayoutTable.ColumnStyles[1].Width = 0;
-			}
-			else if (ZoomInPb == PB_ViewTR || ZoomInPb == PB_ViewBR)
-			{
-				TLP_ViewLayoutTable.ColumnStyles[0].Width = 0;
-				TLP_ViewLayoutTable.ColumnStyles[1].Width = TLP_ViewLayoutTable.Width;
-			}
-			else
-			{
-				TLP_ViewLayoutTable.ColumnStyles[0].Width = TLP_ViewLayoutTable.ColumnStyles[1].Width = TLP_ViewLayoutTable.Width * 0.5f;
-			}
-		}
-		private void PB_ViewTL_Paint(object sender, PaintEventArgs e)
+		private void PB_ViewImage_Paint(object sender, PaintEventArgs e)
 		{
 			lock (ImageLock)
 			{
@@ -95,14 +54,24 @@ namespace AutoDriveControlor.Forms
 				e.Graphics.DrawImage(StateImage, zommImgRect);
 			}
 		}
-		private void PB_ViewTR_Paint(object sender, PaintEventArgs e)
+		private void PB_ViewImage_DoubleClick(object sender, EventArgs e)
 		{
+			if (IsZoomIn)
+			{
+				IsZoomIn = false;
+				PB_ViewImage.Size = new Size(320, 240);
+			}
+			else
+			{
+				IsZoomIn = true;
+				PB_ViewImage.Size = PB_ViewVisualizer.Size;
+			}
 		}
-		private void PB_ViewBL_Paint(object sender, PaintEventArgs e)
+		private void PB_ViewVisualizer_Resize(object sender, EventArgs e)
 		{
-		}
-		private void PB_ViewBR_Paint(object sender, PaintEventArgs e)
-		{
+			Core.ExecuteEvent("RESIZE_VISUALIZER");
+			if (IsZoomIn)
+				PB_ViewImage.Size = PB_ViewVisualizer.Size;
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,6 +152,15 @@ namespace AutoDriveControlor.Forms
 					break;
 				case Keys.OemSemicolon:
 					YawFunc = CommandYawRight;
+					break;
+
+				case Keys.Space:
+					Thread th;
+					if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+						th = new Thread(new ThreadStart(() => { Core.ExecuteEvent("POP_ALL_IMAGE_PC"); }));
+					else
+						th = new Thread(new ThreadStart(() => { Core.ExecuteEvent("PUSH_IMAGE_PC"); }));
+					th.Start();
 					break;
 			}
 		}
@@ -280,7 +258,7 @@ namespace AutoDriveControlor.Forms
 		}
 		private void AutoDriveControlor_Load(object sender, EventArgs e)
 		{
-			Core.Init(CONNECTION_STRINGS.EXTERN_SUB, CONNECTION_STRINGS.EXTERN_PUB, PB_ViewTR.Handle);
+			Core.Init(CONNECTION_STRINGS.EXTERN_SUB, CONNECTION_STRINGS.EXTERN_PUB, PB_ViewVisualizer.Handle);
 			CameraViewTask = Task.Run(() => { UpdateCameraViewThreadFunc(); });
 			CommandTask = Task.Run(() => { UpdateCommandThreadFunc(); });
 		}
@@ -300,10 +278,6 @@ namespace AutoDriveControlor.Forms
 		private void BTN_FocusMainForm_Click(object sender, EventArgs e)
 		{
 			this.Focus();
-		}
-		private void BTN_Image2Pc_Click(object sender, EventArgs e)
-		{
-			Core.ExecuteEvent("CAMERA_PC_CAP");
 		}
 	}
 }

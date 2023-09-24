@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="소스 파일\Modules">
+      <UniqueIdentifier>{680bbf9d-acfd-4bf6-bdce-720478d1f9b7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Modules">
+      <UniqueIdentifier>{c3dd165b-8bba-4a9e-be54-dd3f70054d1c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AutoDriveCore.h">
@@ -30,8 +36,23 @@
     <ClInclude Include="Switcher.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="ImageFilter.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="TypeToTypeFilter.h">
+      <Filter>헤더 파일\Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="MachineDebugImageFilter.h">
+      <Filter>헤더 파일\Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="CopyFrame.h">
+      <Filter>헤더 파일\Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="RotateCropImageFilter.h">
+      <Filter>헤더 파일\Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageToPointCloudFilter.h">
+      <Filter>헤더 파일\Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="ICPPointCloudFilter.h">
+      <Filter>헤더 파일\Modules</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -47,8 +68,17 @@
     <ClCompile Include="Switcher.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="ImageFilter.cpp">
-      <Filter>소스 파일</Filter>
+    <ClCompile Include="MachineDebugImageFilter.cpp">
+      <Filter>소스 파일\Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="RotateCropImageFilter.cpp">
+      <Filter>소스 파일\Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageToPointCloudFilter.cpp">
+      <Filter>소스 파일\Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="ICPPointCloudFilter.cpp">
+      <Filter>소스 파일\Modules</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

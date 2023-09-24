@@ -6,6 +6,7 @@
 
 namespace AutoDriveCode {
 	typedef std::chrono::steady_clock ClockType;
+	typedef ClockType::time_point TimePointType;
 
 	typedef pcl::PointXYZ PTType;
 	typedef pcl::PointNormal PTNType;
@@ -77,39 +78,18 @@ namespace AutoDriveCode {
 		double GetTemperature();
 		int GetStateBits();
 	};
-	struct CaliDataType {
-		int Margin;
-		double RollDegree;
-		cv::Size PointCloudSize;
-		PTCPtr PointOffsets;
 
-		void Init();
-	};
-
-	class DeltaImageType {
+	template<typename TYPE>
+	class DeltaType {
 	private:
 		std::mutex syncMutex;
-		ClockType::time_point Time = ClockType::time_point::min();
-
-		cv::Mat Image;
-		float PitchDegree;
-		float YawDegree;
+		TimePointType Time = TimePointType::min();
+		TYPE Data;
 
 	public:
-		void Set(DeltaImageType& deltaImage);
-		void Set(cv::Mat img, float pitch, float yaw);
-		void Get(ClockType::time_point& time, cv::Mat& img, float& pitch, float& yaw);
-	};
-	class DeltaLidarPoint {
-	private:
-		std::mutex syncMutex;
-		ClockType::time_point Time = ClockType::time_point::min();
-
-		PTCPtr LidarPoints = NULL;
-
-	public:
-		void Set(PTCPtr pc);
-		void Get(ClockType::time_point& time, PTCPtr& pc);
+		void Set(DeltaType<TYPE>& deltaPc);
+		void Set(TYPE pc);
+		void Get(TimePointType& time, TYPE& pc);
 	};
 
 	class ConclusionType {

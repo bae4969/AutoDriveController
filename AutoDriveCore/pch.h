@@ -24,6 +24,10 @@
 #include <pcl/visualization/pcl_plotter.h>
 #include <pcl/visualization/point_picking_event.h>
 #include <pcl/common/transforms.h>
+#include <pcl/registration/icp.h>
+#include <pcl/registration/gicp.h>
+#include <pcl/registration/icp_nl.h>
+#include <pcl/filters/voxel_grid.h>
 
 #include <vtkRenderWindow.h>
 

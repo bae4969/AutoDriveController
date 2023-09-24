@@ -236,15 +236,26 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="AutoDriveCore.h" />
+    <ClInclude Include="CopyFrame.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_TEST|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="Defs.h" />
-    <ClInclude Include="ImageFilter.h" />
+    <ClInclude Include="ICPPointCloudFilter.h" />
+    <ClInclude Include="ImageToPointCloudFilter.h" />
+    <ClInclude Include="RotateCropImageFilter.h" />
+    <ClInclude Include="TypeToTypeFilter.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Switcher.h" />
     <ClInclude Include="Types.h" />
+    <ClInclude Include="MachineDebugImageFilter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AutoDriveCore.cpp" />
-    <ClCompile Include="ImageFilter.cpp" />
+    <ClCompile Include="ICPPointCloudFilter.cpp" />
+    <ClCompile Include="ImageToPointCloudFilter.cpp" />
+    <ClCompile Include="MachineDebugImageFilter.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_TEST|x64'">Create</PrecompiledHeader>
@@ -253,6 +264,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_TEST|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="RotateCropImageFilter.cpp" />
     <ClCompile Include="Switcher.cpp" />
     <ClCompile Include="Types.cpp" />
   </ItemGroup>

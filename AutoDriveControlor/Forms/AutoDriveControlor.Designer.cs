@@ -28,133 +28,43 @@
 		/// </summary>
 		private void InitializeComponent()
 		{
-			PB_ViewTL = new PictureBox();
-			PB_ViewTR = new PictureBox();
-			PB_ViewBL = new PictureBox();
-			PB_ViewBR = new PictureBox();
-			TLP_ViewLayoutTable = new TableLayoutPanel();
-			SC_ViewAndControl = new SplitContainer();
-			BTN_Image2Pc = new Button();
+			PB_ViewImage = new PictureBox();
+			PB_ViewVisualizer = new PictureBox();
 			BTN_FocusMainForm = new Button();
-			((System.ComponentModel.ISupportInitialize)PB_ViewTL).BeginInit();
-			((System.ComponentModel.ISupportInitialize)PB_ViewTR).BeginInit();
-			((System.ComponentModel.ISupportInitialize)PB_ViewBL).BeginInit();
-			((System.ComponentModel.ISupportInitialize)PB_ViewBR).BeginInit();
-			TLP_ViewLayoutTable.SuspendLayout();
-			((System.ComponentModel.ISupportInitialize)SC_ViewAndControl).BeginInit();
-			SC_ViewAndControl.Panel1.SuspendLayout();
-			SC_ViewAndControl.Panel2.SuspendLayout();
-			SC_ViewAndControl.SuspendLayout();
+			((System.ComponentModel.ISupportInitialize)PB_ViewImage).BeginInit();
+			((System.ComponentModel.ISupportInitialize)PB_ViewVisualizer).BeginInit();
 			SuspendLayout();
 			// 
-			// PB_ViewTL
+			// PB_ViewImage
 			// 
-			PB_ViewTL.BackColor = SystemColors.ControlDark;
-			PB_ViewTL.Dock = DockStyle.Fill;
-			PB_ViewTL.Location = new Point(3, 3);
-			PB_ViewTL.Name = "PB_ViewTL";
-			PB_ViewTL.Size = new Size(478, 374);
-			PB_ViewTL.SizeMode = PictureBoxSizeMode.Zoom;
-			PB_ViewTL.TabIndex = 16;
-			PB_ViewTL.TabStop = false;
-			PB_ViewTL.Paint += PB_ViewTL_Paint;
-			PB_ViewTL.DoubleClick += PB_DoubleClickEvent;
-			PB_ViewTL.Validated += AbsorbFocus;
+			PB_ViewImage.BackColor = SystemColors.ControlDark;
+			PB_ViewImage.Location = new Point(0, 0);
+			PB_ViewImage.Name = "PB_ViewImage";
+			PB_ViewImage.Size = new Size(320, 240);
+			PB_ViewImage.SizeMode = PictureBoxSizeMode.Zoom;
+			PB_ViewImage.TabIndex = 16;
+			PB_ViewImage.TabStop = false;
+			PB_ViewImage.Paint += PB_ViewImage_Paint;
+			PB_ViewImage.DoubleClick += PB_ViewImage_DoubleClick;
+			PB_ViewImage.Validated += AbsorbFocus;
 			// 
-			// PB_ViewTR
+			// PB_ViewVisualizer
 			// 
-			PB_ViewTR.BackColor = SystemColors.ControlDark;
-			PB_ViewTR.Dock = DockStyle.Fill;
-			PB_ViewTR.Location = new Point(487, 3);
-			PB_ViewTR.Name = "PB_ViewTR";
-			PB_ViewTR.Size = new Size(479, 374);
-			PB_ViewTR.SizeMode = PictureBoxSizeMode.Zoom;
-			PB_ViewTR.TabIndex = 17;
-			PB_ViewTR.TabStop = false;
-			PB_ViewTR.Paint += PB_ViewTR_Paint;
-			PB_ViewTR.DoubleClick += PB_DoubleClickEvent;
-			PB_ViewTR.Validated += AbsorbFocus;
-			// 
-			// PB_ViewBL
-			// 
-			PB_ViewBL.BackColor = SystemColors.ControlDark;
-			PB_ViewBL.Dock = DockStyle.Fill;
-			PB_ViewBL.Location = new Point(3, 383);
-			PB_ViewBL.Name = "PB_ViewBL";
-			PB_ViewBL.Size = new Size(478, 375);
-			PB_ViewBL.SizeMode = PictureBoxSizeMode.Zoom;
-			PB_ViewBL.TabIndex = 18;
-			PB_ViewBL.TabStop = false;
-			PB_ViewBL.Paint += PB_ViewBL_Paint;
-			PB_ViewBL.DoubleClick += PB_DoubleClickEvent;
-			PB_ViewBL.Validated += AbsorbFocus;
-			// 
-			// PB_ViewBR
-			// 
-			PB_ViewBR.BackColor = SystemColors.ControlDark;
-			PB_ViewBR.Dock = DockStyle.Fill;
-			PB_ViewBR.Location = new Point(487, 383);
-			PB_ViewBR.Name = "PB_ViewBR";
-			PB_ViewBR.Size = new Size(479, 375);
-			PB_ViewBR.SizeMode = PictureBoxSizeMode.Zoom;
-			PB_ViewBR.TabIndex = 18;
-			PB_ViewBR.TabStop = false;
-			PB_ViewBR.Paint += PB_ViewBR_Paint;
-			PB_ViewBR.DoubleClick += PB_DoubleClickEvent;
-			PB_ViewBR.Validated += AbsorbFocus;
-			// 
-			// TLP_ViewLayoutTable
-			// 
-			TLP_ViewLayoutTable.ColumnCount = 2;
-			TLP_ViewLayoutTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-			TLP_ViewLayoutTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-			TLP_ViewLayoutTable.Controls.Add(PB_ViewBR, 1, 1);
-			TLP_ViewLayoutTable.Controls.Add(PB_ViewBL, 0, 1);
-			TLP_ViewLayoutTable.Controls.Add(PB_ViewTR, 1, 0);
-			TLP_ViewLayoutTable.Controls.Add(PB_ViewTL, 0, 0);
-			TLP_ViewLayoutTable.Dock = DockStyle.Fill;
-			TLP_ViewLayoutTable.Location = new Point(0, 0);
-			TLP_ViewLayoutTable.Name = "TLP_ViewLayoutTable";
-			TLP_ViewLayoutTable.RowCount = 2;
-			TLP_ViewLayoutTable.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-			TLP_ViewLayoutTable.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-			TLP_ViewLayoutTable.Size = new Size(969, 761);
-			TLP_ViewLayoutTable.TabIndex = 18;
-			// 
-			// SC_ViewAndControl
-			// 
-			SC_ViewAndControl.Dock = DockStyle.Fill;
-			SC_ViewAndControl.FixedPanel = FixedPanel.Panel2;
-			SC_ViewAndControl.IsSplitterFixed = true;
-			SC_ViewAndControl.Location = new Point(0, 0);
-			SC_ViewAndControl.Name = "SC_ViewAndControl";
-			// 
-			// SC_ViewAndControl.Panel1
-			// 
-			SC_ViewAndControl.Panel1.Controls.Add(TLP_ViewLayoutTable);
-			// 
-			// SC_ViewAndControl.Panel2
-			// 
-			SC_ViewAndControl.Panel2.Controls.Add(BTN_Image2Pc);
-			SC_ViewAndControl.Panel2.Controls.Add(BTN_FocusMainForm);
-			SC_ViewAndControl.Size = new Size(1184, 761);
-			SC_ViewAndControl.SplitterDistance = 969;
-			SC_ViewAndControl.TabIndex = 19;
-			// 
-			// BTN_Image2Pc
-			// 
-			BTN_Image2Pc.Location = new Point(3, 50);
-			BTN_Image2Pc.Name = "BTN_Image2Pc";
-			BTN_Image2Pc.Size = new Size(94, 35);
-			BTN_Image2Pc.TabIndex = 3;
-			BTN_Image2Pc.Text = "Capture";
-			BTN_Image2Pc.UseVisualStyleBackColor = true;
-			BTN_Image2Pc.Click += BTN_Image2Pc_Click;
+			PB_ViewVisualizer.BackColor = SystemColors.ControlDark;
+			PB_ViewVisualizer.Dock = DockStyle.Fill;
+			PB_ViewVisualizer.Location = new Point(0, 0);
+			PB_ViewVisualizer.Name = "PB_ViewVisualizer";
+			PB_ViewVisualizer.Size = new Size(1184, 761);
+			PB_ViewVisualizer.SizeMode = PictureBoxSizeMode.Zoom;
+			PB_ViewVisualizer.TabIndex = 17;
+			PB_ViewVisualizer.TabStop = false;
+			PB_ViewVisualizer.Resize += PB_ViewVisualizer_Resize;
 			// 
 			// BTN_FocusMainForm
 			// 
+			BTN_FocusMainForm.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 			BTN_FocusMainForm.Font = new Font("Arial Black", 14.25F, FontStyle.Bold, GraphicsUnit.Point);
-			BTN_FocusMainForm.Location = new Point(3, 3);
+			BTN_FocusMainForm.Location = new Point(979, 720);
 			BTN_FocusMainForm.Name = "BTN_FocusMainForm";
 			BTN_FocusMainForm.Size = new Size(205, 41);
 			BTN_FocusMainForm.TabIndex = 2;
@@ -167,7 +77,9 @@
 			AutoScaleDimensions = new SizeF(7F, 15F);
 			AutoScaleMode = AutoScaleMode.Font;
 			ClientSize = new Size(1184, 761);
-			Controls.Add(SC_ViewAndControl);
+			Controls.Add(BTN_FocusMainForm);
+			Controls.Add(PB_ViewImage);
+			Controls.Add(PB_ViewVisualizer);
 			DoubleBuffered = true;
 			Font = new Font("Arial", 9F, FontStyle.Regular, GraphicsUnit.Point);
 			KeyPreview = true;
@@ -177,15 +89,8 @@
 			Load += AutoDriveControlor_Load;
 			KeyDown += CommonKeyDown;
 			KeyUp += CommonKeyUP;
-			((System.ComponentModel.ISupportInitialize)PB_ViewTL).EndInit();
-			((System.ComponentModel.ISupportInitialize)PB_ViewTR).EndInit();
-			((System.ComponentModel.ISupportInitialize)PB_ViewBL).EndInit();
-			((System.ComponentModel.ISupportInitialize)PB_ViewBR).EndInit();
-			TLP_ViewLayoutTable.ResumeLayout(false);
-			SC_ViewAndControl.Panel1.ResumeLayout(false);
-			SC_ViewAndControl.Panel2.ResumeLayout(false);
-			((System.ComponentModel.ISupportInitialize)SC_ViewAndControl).EndInit();
-			SC_ViewAndControl.ResumeLayout(false);
+			((System.ComponentModel.ISupportInitialize)PB_ViewImage).EndInit();
+			((System.ComponentModel.ISupportInitialize)PB_ViewVisualizer).EndInit();
 			ResumeLayout(false);
 		}
 
@@ -204,15 +109,10 @@
 		private Button BTN_ResetYaw;
 		private Button BTN_ResetPitch;
 		private Button BTN_TurnOff;
-		private PictureBox PB_ViewTL;
-		private PictureBox PB_ViewTR;
-		private PictureBox PB_ViewBL;
-		private PictureBox PB_ViewBR;
+		private PictureBox PB_ViewImage;
 		private TableLayoutPanel tableLayoutPanel1;
 		private TableLayoutPanel tableLayoutPanel2;
-		private TableLayoutPanel TLP_ViewLayoutTable;
-		private SplitContainer SC_ViewAndControl;
 		private Button BTN_FocusMainForm;
-		private Button BTN_Image2Pc;
+		private PictureBox PB_ViewVisualizer;
 	}
 }

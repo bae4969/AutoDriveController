@@ -163,85 +163,34 @@ namespace AutoDriveCode {
 		return ret;
 	}
 
-	void CaliDataType::Init() {
-		Margin = IMAGE_EDGE_CUT_MARGIN;
-		RollDegree = -2.1;
 
-		PointCloudSize.width = (CAMERA_IMAGE_WIDTH - (2 * Margin)) * IMAGE_TO_POINT_SIZE_RATE;
-		PointCloudSize.height = (CAMERA_IMAGE_HEIGHT - (2 * Margin)) * IMAGE_TO_POINT_SIZE_RATE;
-
-		float x_scale = CAMERA_IMAGE_X_DISTANCE_RATE * IMAGE_POINT_DEFAULT_DISTANCE / PointCloudSize.width;
-		float z_scale = CAMERA_IMAGE_Y_DISTANCE_RATE * IMAGE_POINT_DEFAULT_DISTANCE / PointCloudSize.height;
-		float x_offset = -PointCloudSize.width * 0.5f;
-		float z_offset = -PointCloudSize.height * 0.5f;
-
-		PTCPtr t_offset(new PTCType());
-		t_offset->resize(PointCloudSize.area());
-		for (int y = 0; y < PointCloudSize.height; y++) {
-			for (int x = 0; x < PointCloudSize.width; x++) {
-				size_t idx = y * PointCloudSize.width + x;
-				PTType& pt = t_offset->at(idx);
-				pt.x = (x_offset + x) * x_scale;
-				pt.y = IMAGE_POINT_DEFAULT_DISTANCE;
-				pt.z = -(z_offset + y) * z_scale;
-
-				float scalrValue = sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z);
-				float multiValue = IMAGE_POINT_DEFAULT_DISTANCE / scalrValue;
-				pt.x *= multiValue;
-				pt.y *= multiValue;
-				pt.z *= multiValue;
-			}
-		}
-		PointOffsets = t_offset;
-
-		Eigen::AngleAxisd roll(DEGREE_TO_RADIAN(RollDegree), -Eigen::Vector3d::UnitY());
-		Eigen::Matrix3d rotationMatrix = roll.matrix();
-		Eigen::Matrix4f transMat = Eigen::Matrix4f::Identity();
-		for (int i = 0; i < 3; i++)for (int j = 0; j < 3; j++)
-			transMat.col(i)[j] = rotationMatrix.col(i)[j];
-
-		PointOffsets = make_shared<PTCType>();
-		pcl::transformPointCloud(*t_offset, *PointOffsets, transMat);
-	}
-
-
-	void DeltaImageType::Set(DeltaImageType& deltaImage) {
+	template void DeltaType<Mat>::Set(DeltaType<Mat>& delta);
+	template void DeltaType<PTLNCPtr>::Set(DeltaType<PTLNCPtr>& delta);
+	template void DeltaType<PTNCPtr>::Set(DeltaType<PTNCPtr>& delta);
+	template<typename TYPE> void DeltaType<TYPE>::Set(DeltaType<TYPE>& delta) {
 		syncMutex.lock();
-		deltaImage.syncMutex.lock();
-		Time = deltaImage.Time;
-		Image = deltaImage.Image;
-		PitchDegree = deltaImage.PitchDegree;
-		YawDegree = deltaImage.YawDegree;
-		deltaImage.syncMutex.unlock();
+		delta.syncMutex.lock();
+		Time = delta.Time;
+		Data = delta.Data;
+		delta.syncMutex.unlock();
 		syncMutex.unlock();
 	}
-	void DeltaImageType::Set(Mat img, float pitch, float yaw) {
+	template void DeltaType<Mat>::Set(Mat delta);
+	template void DeltaType<PTLNCPtr>::Set(PTLNCPtr delta);
+	template void DeltaType<PTNCPtr>::Set(PTNCPtr delta);
+	template<typename TYPE> void DeltaType<TYPE>::Set(TYPE data) {
 		syncMutex.lock();
 		Time = ClockType::now();
-		Image = img;
-		PitchDegree = pitch;
-		YawDegree = yaw;
+		Data = data;
 		syncMutex.unlock();
 	}
-	void DeltaImageType::Get(ClockType::time_point& time, Mat& img, float& pitch, float& yaw) {
+	template void DeltaType<Mat>::Get(TimePointType& time, Mat& delta);
+	template void DeltaType<PTLNCPtr>::Get(TimePointType& time, PTLNCPtr& delta);
+	template void DeltaType<PTNCPtr>::Get(TimePointType& time, PTNCPtr& delta);
+	template<typename TYPE> void DeltaType<TYPE>::Get(TimePointType& time, TYPE& data) {
 		syncMutex.lock();
 		time = Time;
-		img = Image;
-		pitch = PitchDegree;
-		yaw = YawDegree;
-		syncMutex.unlock();
-	}
-
-	void DeltaLidarPoint::Set(PTCPtr pc) {
-		syncMutex.lock();
-		Time = ClockType::now();
-		LidarPoints = pc;
-		syncMutex.unlock();
-	}
-	void DeltaLidarPoint::Get(ClockType::time_point& time, PTCPtr& pc) {
-		syncMutex.lock();
-		time = Time;
-		pc = LidarPoints;
+		data = Data;
 		syncMutex.unlock();
 	}
 }
