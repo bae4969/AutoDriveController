@@ -28,6 +28,14 @@
 #include <pcl/registration/gicp.h>
 #include <pcl/registration/icp_nl.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/features/pfhrgb.h>
+#include <pcl/features/ppfrgb.h>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/registration/correspondence_estimation.h>
+#include <pcl/registration/correspondence_rejection_features.h>
+#include <pcl/registration/correspondence_rejection_distance.h>
+#include <pcl/registration/correspondence_rejection_sample_consensus.h>
+#include <pcl/registration/transformation_estimation_svd.h>
 
 #include <vtkRenderWindow.h>
 

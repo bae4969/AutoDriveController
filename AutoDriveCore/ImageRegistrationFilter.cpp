@@ -1,10 +1,10 @@
 #include "pch.h"
-#include "ICPPointCloudFilter.h"
+#include "ImageRegistrationFilter.h"
 
 AUTODRIVECORE_MODULE_START
 
 using namespace std;
-using namespace pcl;
+using namespace cv;
 
 
 

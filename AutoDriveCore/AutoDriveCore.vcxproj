@@ -101,17 +101,17 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>$(ProjectName)_d</TargetName>
     <OutDir>$(SolutionDir)temp</OutDir>
-    <IncludePath>..\..\..\..\..\..\..\..\exlib\cuda\include;..\..\..\..\..\..\..\..\exlib\x64\include;..\..\..\..\..\..\..\..\exlib\x64\include\opencv470;..\..\..\..\..\..\..\..\exlib\x64\include\eigen3;..\..\..\..\..\..\..\..\exlib\x64\include\pcl-1.13;..\..\..\..\..\..\..\..\exlib\x64\include\zmq-4.3.4;..\..\..\..\..\..\..\..\exlib\x64\include\vtk-9.2;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..\..\..\..\exlib\cuda\include;..\..\..\..\..\..\..\..\exlib\x64\include;..\..\..\..\..\..\..\..\exlib\x64\include\opencv470;..\..\..\..\..\..\..\..\exlib\x64\include\eigen3;..\..\..\..\..\..\..\..\exlib\x64\include\pcl-1.13;..\..\..\..\..\..\..\..\exlib\x64\include\zmq-4.3.4;..\..\..\..\..\..\..\..\exlib\x64\include\vtk-9.2;..\..\..\..\..\..\..\..\exlib\x64\include\openssl-3.1.4;$(IncludePath)</IncludePath>
     <LibraryPath>..\..\..\..\..\..\..\..\exlib\x64\lib;..\..\..\..\..\..\..\..\exlib\cuda\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)temp</OutDir>
-    <IncludePath>..\..\..\..\..\..\..\..\exlib\cuda\include;..\..\..\..\..\..\..\..\exlib\x64\include;..\..\..\..\..\..\..\..\exlib\x64\include\opencv470;..\..\..\..\..\..\..\..\exlib\x64\include\eigen3;..\..\..\..\..\..\..\..\exlib\x64\include\pcl-1.13;..\..\..\..\..\..\..\..\exlib\x64\include\zmq-4.3.4;..\..\..\..\..\..\..\..\exlib\x64\include\vtk-9.2;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..\..\..\..\exlib\cuda\include;..\..\..\..\..\..\..\..\exlib\x64\include;..\..\..\..\..\..\..\..\exlib\x64\include\opencv470;..\..\..\..\..\..\..\..\exlib\x64\include\eigen3;..\..\..\..\..\..\..\..\exlib\x64\include\pcl-1.13;..\..\..\..\..\..\..\..\exlib\x64\include\zmq-4.3.4;..\..\..\..\..\..\..\..\exlib\x64\include\vtk-9.2;..\..\..\..\..\..\..\..\exlib\x64\include\openssl-3.1.4;$(IncludePath)</IncludePath>
     <LibraryPath>..\..\..\..\..\..\..\..\exlib\x64\lib;..\..\..\..\..\..\..\..\exlib\cuda\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_TEST|x64'">
     <OutDir>$(SolutionDir)temp</OutDir>
-    <IncludePath>..\..\..\..\..\..\..\..\exlib\cuda\include;..\..\..\..\..\..\..\..\exlib\x64\include;..\..\..\..\..\..\..\..\exlib\x64\include\opencv470;..\..\..\..\..\..\..\..\exlib\x64\include\eigen3;..\..\..\..\..\..\..\..\exlib\x64\include\pcl-1.13;..\..\..\..\..\..\..\..\exlib\x64\include\zmq-4.3.4;..\..\..\..\..\..\..\..\exlib\x64\include\vtk-9.2;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..\..\..\..\exlib\cuda\include;..\..\..\..\..\..\..\..\exlib\x64\include;..\..\..\..\..\..\..\..\exlib\x64\include\opencv470;..\..\..\..\..\..\..\..\exlib\x64\include\eigen3;..\..\..\..\..\..\..\..\exlib\x64\include\pcl-1.13;..\..\..\..\..\..\..\..\exlib\x64\include\zmq-4.3.4;..\..\..\..\..\..\..\..\exlib\x64\include\vtk-9.2;..\..\..\..\..\..\..\..\exlib\x64\include\openssl-3.1.4;$(IncludePath)</IncludePath>
     <LibraryPath>..\..\..\..\..\..\..\..\exlib\x64\lib;..\..\..\..\..\..\..\..\exlib\cuda\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -177,7 +177,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/openmp:llvm %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/openmp:llvm /bigobj %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -199,7 +199,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/openmp:llvm %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/openmp:llvm /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -222,7 +222,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/openmp:llvm %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/openmp:llvm /bigobj %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
     </ClCompile>
     <Link>
@@ -242,8 +242,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_TEST|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="Defs.h" />
-    <ClInclude Include="ICPPointCloudFilter.h" />
+    <ClInclude Include="ImageRegistrationFilter.h" />
     <ClInclude Include="ImageToPointCloudFilter.h" />
+    <ClInclude Include="LidarRegistrationFilter.h" />
     <ClInclude Include="RotateCropImageFilter.h" />
     <ClInclude Include="TypeToTypeFilter.h" />
     <ClInclude Include="pch.h" />
@@ -253,7 +254,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AutoDriveCore.cpp" />
-    <ClCompile Include="ICPPointCloudFilter.cpp" />
+    <ClCompile Include="ImageRegistrationFilter.cpp" />
     <ClCompile Include="ImageToPointCloudFilter.cpp" />
     <ClCompile Include="MachineDebugImageFilter.cpp" />
     <ClCompile Include="pch.cpp">
@@ -264,6 +265,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_TEST|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="LidarRegistrationFilter.cpp" />
     <ClCompile Include="RotateCropImageFilter.cpp" />
     <ClCompile Include="Switcher.cpp" />
     <ClCompile Include="Types.cpp" />

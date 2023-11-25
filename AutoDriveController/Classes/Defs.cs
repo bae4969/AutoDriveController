@@ -8,11 +8,11 @@ namespace AutoDriveControlor.Classes
 {
 	public static class CONNECTION_STRINGS
 	{
-		//public const string XPUB = "tcp://192.168.211.200:45001";
-		//public const string XSUB = "tcp://192.168.211.200:45000";
+		//public const string EXTERN_PUB = "tcp://192.168.0.150:45001";
+		//public const string EXTERN_SUB = "tcp://192.168.0.150:45000";
 
-		public const string EXTERN_PUB = "tcp://192.168.0.150:45001";
-		public const string EXTERN_SUB = "tcp://192.168.0.150:45000";
+		public const string EXTERN_PUB = "tcp://BaeIptimeDDNSAddress.iptime.org:45001";
+		public const string EXTERN_SUB = "tcp://BaeIptimeDDNSAddress.iptime.org:45000";
 	}
 
 	public static class PB_CAL

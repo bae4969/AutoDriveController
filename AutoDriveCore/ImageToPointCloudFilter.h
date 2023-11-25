@@ -24,7 +24,7 @@ class ImageToPointCloudFilterType
 	AUTODRIVECORE_CLASS_GET_SET(Eigen::Matrix4f, MoveMatrix);
 
 protected:
-	PTCPtr m_LastCurvedOffset = NULL;
+	PTNCPtr m_LastCurvedOffset = NULL;
 	int m_LastWidth = 0;
 	int m_LastHeight = 0;
 	double m_LastScale = -1.0;

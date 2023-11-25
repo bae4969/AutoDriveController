@@ -87,6 +87,7 @@ namespace AutoDriveCode {
 		subSocket.set(zmq::sockopt::subscribe, "STATE_LCD_DISPLAY");
 		subSocket.set(zmq::sockopt::subscribe, "STATE_LIDAR_SENSOR");
 		subSocket.set(zmq::sockopt::subscribe, "STATE_CAMERA_SENSOR");
+
 		subSocket.connect(m_pubAddress);
 
 		while (!m_isStop) {
@@ -196,7 +197,7 @@ namespace AutoDriveCode {
 					memcpy_s(&t_steer.CurValue, sizeof(t_steer.CurValue), msg->at(3).data(), msg->at(3).size());
 					memcpy_s(&t_steer.TarValue, sizeof(t_steer.TarValue), msg->at(4).data(), msg->at(4).size());
 					memcpy_s(&t_steer.Speed, sizeof(t_steer.Speed), msg->at(5).data(), msg->at(5).size());
-					m_currentMachineState.UpdateMoveMotorState(t_rear, t_steer);
+					m_lastMachineState.UpdateMoveMotorState(t_rear, t_steer);
 				}
 				else if (topic == "STATE_CAMERA_MOTOR") {
 					MotorStateType<float> t_cameraPitch;
@@ -207,7 +208,7 @@ namespace AutoDriveCode {
 					memcpy_s(&t_cameraYaw.CurValue, sizeof(t_cameraYaw.CurValue), msg->at(3).data(), msg->at(3).size());
 					memcpy_s(&t_cameraYaw.TarValue, sizeof(t_cameraYaw.TarValue), msg->at(4).data(), msg->at(4).size());
 					memcpy_s(&t_cameraYaw.Speed, sizeof(t_cameraYaw.Speed), msg->at(5).data(), msg->at(5).size());
-					m_currentMachineState.UpdateCameraMotorState(t_cameraPitch, t_cameraYaw);
+					m_lastMachineState.UpdateCameraMotorState(t_cameraPitch, t_cameraYaw);
 				}
 				else if (topic == "STATE_SENSOR") {
 					double t_sonicSensor;
@@ -216,14 +217,14 @@ namespace AutoDriveCode {
 					memcpy_s(&t_floorSensor[0], sizeof(t_floorSensor[0]), msg->at(1).data(), msg->at(1).size());
 					memcpy_s(&t_floorSensor[1], sizeof(t_floorSensor[1]), msg->at(2).data(), msg->at(2).size());
 					memcpy_s(&t_floorSensor[2], sizeof(t_floorSensor[2]), msg->at(3).data(), msg->at(3).size());
-					m_currentMachineState.UpdateSensorState(t_sonicSensor, t_floorSensor);
+					m_lastMachineState.UpdateSensorState(t_sonicSensor, t_floorSensor);
 				}
 				else if (topic == "STATE_LCD_DISPLAY") {
 					double t_temp;
 					int t_state;
 					memcpy_s(&t_temp, sizeof(t_temp), msg->at(0).data(), msg->at(0).size());
 					memcpy_s(&t_state, sizeof(t_state), msg->at(1).data(), msg->at(1).size());
-					m_currentMachineState.UpdateLcdState(t_temp, t_state);
+					m_lastMachineState.UpdateLcdState(t_temp, t_state);
 				}
 			}
 			catch (...) {}
@@ -258,7 +259,9 @@ namespace AutoDriveCode {
 				memcpy(recvData.data(), data.data(), data.size());
 
 				Mat img = imdecode(recvData, IMREAD_ANYCOLOR);
-				machineDebugImageFilter.SetWithMachineState(m_currentMachineState);
+				m_lastMachineState.UpdateFPS();
+
+				machineDebugImageFilter.SetWithMachineState(m_lastMachineState);
 				machineDebugImageFilter.SetInputImage(img);
 				machineDebugImageFilter.Update();
 
@@ -267,8 +270,8 @@ namespace AutoDriveCode {
 				imageToPointCloudFilter.SetYawDegree(machineDebugImageFilter.GetCameraYawDegree());
 				imageToPointCloudFilter.Update();
 
-				m_currentStateImage.Set(machineDebugImageFilter.GetOutputImage());
-				m_currentImagePc.Set(imageToPointCloudFilter.GetOutputPointCloud());
+				m_lastStateImage.Set(machineDebugImageFilter.GetOutputImage());
+				m_lastImagePc.Set(imageToPointCloudFilter.GetOutputPointCloud());
 			}
 			catch (...) {}
 		}
@@ -305,7 +308,11 @@ namespace AutoDriveCode {
 					pcPtr->push_back(t_pt);
 				}
 
-				m_currentLidarPc.Set(pcPtr);
+				TimePointType tp;
+				PTNCPtr lastPc;
+				m_lastLidarPc.Get(tp, lastPc);
+				ExecuteEventRegistarteRidarPointCloud();
+				m_lastLidarPc.Set(pcPtr);
 			}
 			catch (...) {}
 		}
@@ -326,10 +333,8 @@ namespace AutoDriveCode {
 		while (!m_isStop) {
 			auto start = ClockType::now();
 
-			m_srcCameraPc.Get(cur_image_time, src_Image);
-			// TODO
-			//m_srcLidarPc.Get(cur_lidar_time, src_lidar);
-			m_currentLidarPc.Get(cur_lidar_time, src_lidar);
+			m_curCameraPc.Get(cur_image_time, src_Image);
+			m_curLidarPc.Get(cur_lidar_time, src_lidar);
 
 			delta_trans.setIdentity();
 			if (src_lidar && last_lidar_time != cur_lidar_time) {
@@ -367,7 +372,7 @@ namespace AutoDriveCode {
 	void Switcher::GetStateImage(ImageData& imgData) {
 		TimePointType tp;
 		Mat img;
-		m_currentStateImage.Get(tp, img);
+		m_lastStateImage.Get(tp, img);
 		imgData.Update(img);
 	}
 	void Switcher::ExecuteEventResizeVisualizer() {
@@ -381,21 +386,35 @@ namespace AutoDriveCode {
 	void Switcher::ExecuteEventPushImagePointCloud() {
 		TimePointType tp;
 		PTLNCPtr pc;
-		m_currentImagePc.Get(tp, pc);
+		m_lastImagePc.Get(tp, pc);
 		if (!pc || pc->size() == 0) return;
 
 		m_imagePcBuffer.push(pc);
 	}
 	void Switcher::ExecuteEventPopAllImagePointCloud() {
+		using SearchType = pcl::search::KdTree<PTLNType>;
+		using FeatureEstimationType = pcl::PFHRGBEstimation<PTLNType, PTLNType>;
+		using CorrespondenceEstimationType = pcl::registration::CorrespondenceEstimation<RgbFType, RgbFType>;
+		using CorrespondenceRejection1Type = pcl::registration::CorrespondenceRejectorFeatures;
+		using CorrespondenceRejection2Type = pcl::registration::CorrespondenceRejectorSampleConsensus<PTLNType>;
 		using IcpFilterType = pcl::IterativeClosestPointWithNormals<PTLNType, PTLNType>;
-		//using IcpFilterType = pcl::GeneralizedIterativeClosestPoint<PTLNType, PTLNType>;
+		using TransformEstimationType = pcl::registration::TransformationEstimationSVD<PTLNType, PTLNType>;
 		using DownSampleFilterType = pcl::VoxelGrid<PTLNType>;
 
 		double rate = CAMERA_WIDTH_MPP_IN_ONE_MM_DISTANCE * IMAGE_POINT_DEFAULT_DISTANCE / IMAGE_TO_POINT_SIZE_RATE;
-		IcpFilterType icpFilter;
-		DownSampleFilterType downSampleFilter;
-		icpFilter.setMaxCorrespondenceDistance(rate * 100);
-		downSampleFilter.setLeafSize(rate * 2, rate * 2, rate * 2);
+		PCL_NEW(SearchType, searchMethod);
+		PCL_NEW(FeatureEstimationType, featureEstimation);
+		PCL_NEW(CorrespondenceEstimationType, corrEstimation);
+		PCL_NEW(CorrespondenceRejection1Type, corrRejection1);
+		PCL_NEW(CorrespondenceRejection2Type, corrRejection2);
+		PCL_NEW(IcpFilterType, icpFilter);
+		PCL_NEW(TransformEstimationType, transEstimation);
+		PCL_NEW(DownSampleFilterType, downSampleFilter);
+
+		featureEstimation->setSearchMethod(searchMethod);
+		featureEstimation->setKSearch(10);
+		icpFilter->setMaxCorrespondenceDistance(rate * 5);
+		downSampleFilter->setLeafSize(rate * 2, rate * 2, rate * 2);
 
 		PCL_NEW(PTLNCType, dst);
 		if (m_imagePcBuffer.size() == 1) {
@@ -403,22 +422,60 @@ namespace AutoDriveCode {
 			m_imagePcBuffer.pop();
 		}
 		else if (m_imagePcBuffer.size() > 1) {
-			PTLNCPtr src1, src2;
+			PCL_NEW(PTLNCType, src1);
+			PCL_NEW(PTLNCType, src2);
 			PCL_NEW(PTLNCType, src3);
+			PCL_NEW(RgbFCType, feature1);
+			PCL_NEW(RgbFCType, feature2);
+			PCL_NEW(RgbFCType, feature3);
+			pcl::CorrespondencesPtr allCorr(new pcl::Correspondences);
+			pcl::CorrespondencesPtr featureCorr(new pcl::Correspondences);
+			pcl::CorrespondencesPtr sampleCorr(new pcl::Correspondences);
+
 			src1 = m_imagePcBuffer.front();
 			m_imagePcBuffer.pop();
+			featureEstimation->setInputCloud(src1);
+			featureEstimation->setInputNormals(src1);
+			featureEstimation->compute(*feature1);
+
 			while (m_imagePcBuffer.size() > 0) {
 				src2 = m_imagePcBuffer.front();
 				m_imagePcBuffer.pop();
-				icpFilter.setInputSource(src2);
-				icpFilter.setInputTarget(src1);
-				icpFilter.align(*src3);
+				featureEstimation->setInputCloud(src2);
+				featureEstimation->setInputNormals(src2);
+				featureEstimation->compute(*feature2);
+
+				corrEstimation->setInputSource(feature2);
+				corrEstimation->setInputTarget(feature1);
+				corrEstimation->determineCorrespondences(*allCorr, rate * 5);
+
+				Eigen::Matrix4f mat;
+				transEstimation->estimateRigidTransformation(*src2, *src1, *allCorr, mat);
+
+
+
+				//icpFilter->setCorrespondenceEstimation(corrEstimation);
+				//icpFilter->setInputSource(feature2);
+				//icpFilter->setInputTarget(feature1);
+				//icpFilter->align(*feature3);
+				//auto mat = icpFilter->getLastIncrementalTransformation();
+
+				pcl::transformPointCloud(*src2, *src3, mat);
 				*src1 = (*src1) + (*src3);
 			}
-			downSampleFilter.setInputCloud(src1);
-			downSampleFilter.filter(*dst);
+			downSampleFilter->setInputCloud(src1);
+			downSampleFilter->filter(*dst);
 		}
-		m_srcCameraPc.Set(dst);
+		m_curCameraPc.Set(dst);
+	}
+	void Switcher::ExecuteEventRegistarteRidarPointCloud(){
+		TimePointType tp;
+		PTNCPtr pc;
+		m_lastLidarPc.Get(tp, pc);
+		if (!pc || pc->size() == 0) return;
+
+
+		m_curLidarPc.Set(pc);
 	}
 
 	void Switcher::TurnOff() {
@@ -500,28 +557,28 @@ namespace AutoDriveCode {
 		int targetVal =
 			diff == 0 ?
 			0 :
-			m_currentMachineState.GetRear().CurValue + diff;
+			m_lastMachineState.GetRear().CurValue + diff;
 		SetRearValue(CMD_VALUE_TYPE_TARGET, targetVal);
 	}
 	void Switcher::ChangeSteerValue(float diff) {
 		float targetVal =
 			diff == 0.0 ?
 			0.0f :
-			m_currentMachineState.GetSteer().CurValue + diff;
+			m_lastMachineState.GetSteer().CurValue + diff;
 		SetSteerValue(CMD_VALUE_TYPE_TARGET, targetVal);
 	}
 	void Switcher::ChangeCameraPitchValue(float diff) {
 		float targetVal =
 			diff == 0.0 ?
 			0.0f :
-			m_currentMachineState.GetCameraPitch().CurValue + diff;
+			m_lastMachineState.GetCameraPitch().CurValue + diff;
 		SetCameraPitchValue(CMD_VALUE_TYPE_TARGET, targetVal);
 	}
 	void Switcher::ChangeCameraYawValue(float diff) {
 		float targetVal =
 			diff == 0.0 ?
 			0.0f :
-			m_currentMachineState.GetCameraYaw().CurValue + diff;
+			m_lastMachineState.GetCameraYaw().CurValue + diff;
 		SetCameraYawValue(CMD_VALUE_TYPE_TARGET, targetVal);
 	}
 }

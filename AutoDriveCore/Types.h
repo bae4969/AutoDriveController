@@ -9,19 +9,25 @@ namespace AutoDriveCode {
 	typedef ClockType::time_point TimePointType;
 
 	typedef pcl::PointXYZ PTType;
+	typedef pcl::Normal NorType;
 	typedef pcl::PointNormal PTNType;
 	typedef pcl::PointXYZRGB PTLType;
 	typedef pcl::PointXYZRGBNormal PTLNType;
+	typedef pcl::PFHRGBSignature250 RgbFType;
 
 	typedef pcl::PointCloud<PTType> PTCType;
+	typedef pcl::PointCloud<NorType> NorCType;
 	typedef pcl::PointCloud<PTNType> PTNCType;
 	typedef pcl::PointCloud<PTLType> PTLCType;
 	typedef pcl::PointCloud<PTLNType> PTLNCType;
+	typedef pcl::PointCloud<RgbFType> RgbFCType;
 
 	typedef PTCType::Ptr PTCPtr;
+	typedef NorCType::Ptr NorCPtr;
 	typedef PTNCType::Ptr PTNCPtr;
 	typedef PTLCType::Ptr PTLCPtr;
 	typedef PTLNCType::Ptr PTLNCPtr;
+	typedef RgbFCType::Ptr RgbFCPtr;
 
 	struct ImageData {
 		int W;

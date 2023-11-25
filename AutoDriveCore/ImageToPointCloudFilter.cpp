@@ -39,25 +39,38 @@ void ImageToPointCloudFilterType::initCurvedOffset(int w, int h) {
 	double xScale = m_WidthMPPInOneMmDistance * m_DefaultDistance / m_Scale;
 	double zScale = m_HeightMPPInOneMmDistance * m_DefaultDistance / m_Scale;
 
-	PCL_NEW(PTCType, src);
-	src->resize(w * h);
+
+	PCL_NEW(PTCType, locSrc);
+	locSrc->resize(w * h);
 	for (int y = 0; y < h; y++) {
 		for (int x = 0; x < w; x++) {
 			size_t idx = y * w + x;
-			PTType& pt = src->at(idx);
+			PTType& pt = locSrc->at(idx);
 			pt.x = xScale * (x - halfWidth);
 			pt.y = m_DefaultDistance;
 			pt.z = zScale * (halfHeight - y);
 			float scalrValue_inv = 1.f / sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z);
 			float multiValue = m_DefaultDistance * scalrValue_inv;
-
-			pt.x = pt.x * scalrValue_inv * m_DefaultDistance;
-			pt.y = pt.y * scalrValue_inv * m_DefaultDistance;
-			pt.z = pt.z * scalrValue_inv * m_DefaultDistance;
+			
+			pt.x *= scalrValue_inv * m_DefaultDistance;
+			pt.y *= scalrValue_inv * m_DefaultDistance;
+			pt.z *= scalrValue_inv * m_DefaultDistance;
 		}
 	}
 
-	PCL_NEW(PTCType, dst);
+	PCL_NEW(pcl::search::KdTree<PTType>, tree);
+	PCL_NEW(pcl::PointCloud<NorType>, norSrc);
+	pcl::NormalEstimationOMP<PTType, NorType> normalEstimation;
+	normalEstimation.setInputCloud(locSrc);
+	normalEstimation.setSearchMethod(tree);
+	normalEstimation.setRadiusSearch((xScale + zScale) * 2);
+	normalEstimation.compute(*norSrc);
+
+	PCL_NEW(PTNCType, src);
+	pcl::copyPointCloud<PTType, PTNType>(*locSrc, *src);
+	pcl::copyPointCloud<NorType, PTNType>(*norSrc, *src);
+
+	PCL_NEW(PTNCType, dst);
 	Eigen::Matrix4f translationMat = Eigen::Matrix4f::Identity();
 	translationMat.col(3)[1] = m_OffsetDistance;
 	pcl::transformPointCloud(*src, *dst, translationMat);
@@ -97,14 +110,10 @@ void ImageToPointCloudFilterType::Update() {
 
 	PCL_NEW(PTLNCType, srcPc);
 	srcPc->resize(imgSize.area());
-	copyPointCloud<PTType, PTLNType>(*m_LastCurvedOffset, *srcPc);
+	copyPointCloud<PTNType, PTLNType>(*m_LastCurvedOffset, *srcPc);
 	for (int idx = 0; idx < imgSize.area(); idx++) {
 		PTLNType& src_pt = srcPc->at(idx);
 		Vec3b& pxl = resizedImg.at<Vec3b>(idx);
-		src_pt.normal_x = pxl[0] / 255.f;
-		src_pt.normal_y = pxl[1] / 255.f;
-		src_pt.normal_z = pxl[2] / 255.f;
-		src_pt.curvature = 0.0;
 		src_pt.b = pxl[0];
 		src_pt.g = pxl[1];
 		src_pt.r = pxl[2];

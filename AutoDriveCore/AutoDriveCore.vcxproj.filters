@@ -51,7 +51,10 @@
     <ClInclude Include="ImageToPointCloudFilter.h">
       <Filter>헤더 파일\Modules</Filter>
     </ClInclude>
-    <ClInclude Include="ICPPointCloudFilter.h">
+    <ClInclude Include="LidarRegistrationFilter.h">
+      <Filter>헤더 파일\Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageRegistrationFilter.h">
       <Filter>헤더 파일\Modules</Filter>
     </ClInclude>
   </ItemGroup>
@@ -77,7 +80,10 @@
     <ClCompile Include="ImageToPointCloudFilter.cpp">
       <Filter>소스 파일\Modules</Filter>
     </ClCompile>
-    <ClCompile Include="ICPPointCloudFilter.cpp">
+    <ClCompile Include="LidarRegistrationFilter.cpp">
+      <Filter>소스 파일\Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageRegistrationFilter.cpp">
       <Filter>소스 파일\Modules</Filter>
     </ClCompile>
   </ItemGroup>
