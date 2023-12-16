@@ -33,9 +33,6 @@ namespace AutoDriveCode {
 		else if (eventStr == "PUSH_IMAGE_PC") {
 			g_Switcher.ExecuteEventPushImagePointCloud();
 		}
-		else if (eventStr == "POP_ALL_IMAGE_PC") {
-			g_Switcher.ExecuteEventPopAllImagePointCloud();
-		}
 	}
 
 	void TurnOff() {

@@ -21,7 +21,7 @@ namespace AutoDriveControlor
 				return;
 			}
 
-			Environment.SetEnvironmentVariable("Path", "./bin;D:\\code\\AutoDriveControlor\\temp;");
+			Environment.SetEnvironmentVariable("Path", "./bin;D:\\code\\AutoDriveController\\temp;");
 
 			ApplicationConfiguration.Initialize();
 			Application.Run(new Forms.AutoDriveControlor());

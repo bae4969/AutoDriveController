@@ -27,6 +27,7 @@ namespace AutoDriveCode {
 
 
 	void Switcher::Init(string pubAddress, string subAddress, void* pcWndHandle) {
+
 		m_isStop = false;
 		m_pubAddress = pubAddress;
 		m_subAddress = subAddress;
@@ -297,21 +298,19 @@ namespace AutoDriveCode {
 					float radian = DEGREE_TO_RADIAN(degree);
 					float distance = msg->poptyp<float>();
 					float intensity = msg->poptyp<float>();
-					PTNType t_pt;
-					t_pt.normal_x = sin(radian);
-					t_pt.normal_y = cos(radian);
-					t_pt.normal_z = 0.0;
-					t_pt.curvature = 0.0;
-					t_pt.x = distance * t_pt.normal_x;
-					t_pt.y = distance * t_pt.normal_y;
-					t_pt.z = LIDAR_HEIGHT_OFFSET;
-					pcPtr->push_back(t_pt);
+					for (float t_distance = 1.f; t_distance < distance; t_distance += 10.f) {
+						PTNType t_pt;
+						t_pt.normal_x = sin(radian);
+						t_pt.normal_y = cos(radian);
+						t_pt.normal_z = 0.0;
+						t_pt.curvature = 0.0;
+						t_pt.x = t_distance * t_pt.normal_x;
+						t_pt.y = t_distance * t_pt.normal_y;
+						t_pt.z = LIDAR_HEIGHT_OFFSET;
+						pcPtr->push_back(t_pt);
+					}
 				}
 
-				TimePointType tp;
-				PTNCPtr lastPc;
-				m_lastLidarPc.Get(tp, lastPc);
-				ExecuteEventRegistarteRidarPointCloud();
 				m_lastLidarPc.Set(pcPtr);
 			}
 			catch (...) {}
@@ -322,50 +321,47 @@ namespace AutoDriveCode {
 		TimePointType cur_image_time, cur_lidar_time;
 		last_image_time = last_lidar_time = TimePointType::min();
 
-		PTLNCPtr src_Image;
-		PTNCPtr src_lidar;
+		bool is_new_image;
+		bool is_new_lidar;
+		PTLNCPtr src_Image = nullptr;
+		PTNCPtr src_lidar = nullptr;
+		PTLCPtr viewer_image_pc = nullptr;
+		PTCPtr viewer_lidar_pc = nullptr;
 
-		Eigen::Matrix4f delta_trans;
-
-		PCL_NEW(PTLNCType, dst_image);
-		PCL_NEW(PTNCType, dst_lidar);
-
-		while (!m_isStop) {
-			auto start = ClockType::now();
+		while (m_viewer) {
+			ExecuteEventRegistarteRidarPointCloud(5);
 
 			m_curCameraPc.Get(cur_image_time, src_Image);
 			m_curLidarPc.Get(cur_lidar_time, src_lidar);
 
-			delta_trans.setIdentity();
-			if (src_lidar && last_lidar_time != cur_lidar_time) {
-				last_lidar_time = cur_lidar_time;
-				dst_lidar = src_lidar;
+			is_new_image = last_image_time != cur_image_time;
+			is_new_lidar = last_lidar_time != cur_lidar_time;
+			last_image_time = cur_image_time;
+			last_lidar_time = cur_lidar_time;
+
+			if (src_Image && is_new_image) {
+				viewer_image_pc = make_shared<PTLCType>();
+				copyPointCloud<PTLNType, PTLType>(*src_Image, *viewer_image_pc);
 			}
-			if (src_Image && last_image_time != cur_image_time) {
-				last_image_time = cur_image_time;
-				dst_image = src_Image;
+
+			if (src_lidar && is_new_lidar) {
+				viewer_lidar_pc = make_shared<PTCType>();
+				copyPointCloud<PTNType, PTType>(*src_lidar, *viewer_lidar_pc);
 			}
 
 			if (m_viewer && !m_viewer->wasStopped()) {
-				PCL_NEW(PTLCType, viewer_image_pc);
-				PCL_NEW(PTCType, viewer_lidar_pc);
-				copyPointCloud<PTLNType, PTLType>(*dst_image, *viewer_image_pc);
-				copyPointCloud<PTNType, PTType>(*dst_lidar, *viewer_lidar_pc);
-				if (!m_viewer->updatePointCloud(viewer_image_pc, "IMAGE_POINT")) {
-					m_viewer->addPointCloud(viewer_image_pc, "IMAGE_POINT");
-					m_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "IMAGE_POINT");
+				m_viewer->spinOnce(1000);
+				if (is_new_image &&
+					!m_viewer->updatePointCloud(viewer_image_pc, "IMAGE_POINT") &&
+					!m_viewer->addPointCloud(viewer_image_pc, "IMAGE_POINT"))
+				{
 				}
-				if (!m_viewer->updatePointCloud(viewer_lidar_pc, "LIDAR_POINT")) {
-					m_viewer->addPointCloud(viewer_lidar_pc, "LIDAR_POINT");
-					m_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LIDAR_POINT");
+				if (is_new_lidar &&
+					!m_viewer->updatePointCloud(viewer_lidar_pc, "LIDAR_POINT") &&
+					!m_viewer->addPointCloud(viewer_lidar_pc, "LIDAR_POINT"))
+				{
 				}
 			}
-
-			auto updateTime = chrono::duration_cast<chrono::milliseconds>(ClockType::now() - start).count();
-			if (m_viewer && !m_viewer->wasStopped())
-				m_viewer->spinOnce(updateTime);
-			if (updateTime < 66)
-				this_thread::sleep_for(chrono::milliseconds(66 - updateTime));
 		}
 	}
 
@@ -391,6 +387,7 @@ namespace AutoDriveCode {
 
 		m_imagePcBuffer.push(pc);
 	}
+
 	void Switcher::ExecuteEventPopAllImagePointCloud() {
 		using SearchType = pcl::search::KdTree<PTLNType>;
 		using FeatureEstimationType = pcl::PFHRGBEstimation<PTLNType, PTLNType>;
@@ -468,14 +465,36 @@ namespace AutoDriveCode {
 		}
 		m_curCameraPc.Set(dst);
 	}
-	void Switcher::ExecuteEventRegistarteRidarPointCloud(){
-		TimePointType tp;
-		PTNCPtr pc;
-		m_lastLidarPc.Get(tp, pc);
-		if (!pc || pc->size() == 0) return;
+	void Switcher::ExecuteEventRegistarteRidarPointCloud(float leafSize) {
+		TimePointType lastTp, curTp;
+		PTNCPtr lastPc, curPc;
+		m_lastLidarPc.Get(lastTp, lastPc);
+		m_curLidarPc.Get(curTp, curPc);
+		if (!lastPc || lastPc->size() == 0)
+			return;
 
+		if (lastTp == curTp ||
+			!curPc || curPc->size() == 0) {
+			m_curLidarPc.Set(lastPc);
+		}
+		else {
+			Eigen::Matrix4f transMat;
+			using RegiFilterType = pcl::registration::TransformationEstimation2D<PTNType, PTNType>;
+			RegiFilterType regiFilter;
+			regiFilter.estimateRigidTransformation(*lastPc, *curPc, transMat);
 
-		m_curLidarPc.Set(pc);
+			pcl::transformPointCloud<PTNType>(*lastPc, *lastPc, transMat);
+
+			PCL_NEW(PTNCType, concatPc);
+			pcl::concatenate(*lastPc, *curPc, *concatPc);
+
+			PCL_NEW(PTNCType, downPc);
+			pcl::VoxelGrid<PTNType> sor;
+			sor.setInputCloud(concatPc);
+			sor.setLeafSize(leafSize, leafSize, leafSize);
+			sor.filter(*downPc);
+			m_curLidarPc.Set(downPc);
+		}
 	}
 
 	void Switcher::TurnOff() {

@@ -37,7 +37,6 @@ namespace AutoDriveControlor.Forms
 					t_stateImage?.Dispose();
 				}
 				PB_ViewImage.Invalidate();
-				PB_ViewVisualizer.Invalidate();
 
 				if ((TimeSpan.FromMilliseconds(33) - (DateTime.Now - start)).Milliseconds > 0)
 					Thread.Sleep(TimeSpan.FromMilliseconds(33) - (DateTime.Now - start));
@@ -155,11 +154,7 @@ namespace AutoDriveControlor.Forms
 					break;
 
 				case Keys.Space:
-					Thread th;
-					if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
-						th = new Thread(new ThreadStart(() => { Core.ExecuteEvent("POP_ALL_IMAGE_PC"); }));
-					else
-						th = new Thread(new ThreadStart(() => { Core.ExecuteEvent("PUSH_IMAGE_PC"); }));
+					Thread th = new(new ThreadStart(() => { Core.ExecuteEvent("PUSH_IMAGE_PC"); }));
 					th.Start();
 					break;
 			}

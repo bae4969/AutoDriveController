@@ -12,6 +12,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AutoDriveCore", "AutoDriveCore\AutoDriveCore.vcxproj", "{8F55CCAB-BF99-45F7-BDB2-8A6781097258}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutoDriveController", "AutoDriveController\AutoDriveController.csproj", "{7B57905B-B8B5-4191-BB3A-B148B310C009}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8F55CCAB-BF99-45F7-BDB2-8A6781097258} = {8F55CCAB-BF99-45F7-BDB2-8A6781097258}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

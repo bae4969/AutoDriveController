@@ -36,6 +36,7 @@
 #include <pcl/registration/correspondence_rejection_distance.h>
 #include <pcl/registration/correspondence_rejection_sample_consensus.h>
 #include <pcl/registration/transformation_estimation_svd.h>
+#include <pcl/registration/transformation_estimation_2D.h>
 
 #include <vtkRenderWindow.h>
 

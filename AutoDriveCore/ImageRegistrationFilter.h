@@ -5,7 +5,7 @@
 AUTODRIVECORE_MODULE_START
 
 class ImageRegistrationFilterType
-	: public PointCloudToPointCloudFilterType<PTLNCPtr, PTLNCPtr>
+	: public PointCloudToPointCloudFilterType<PTLNCType, PTLNCType>
 {
 
 };

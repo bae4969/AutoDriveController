@@ -60,7 +60,7 @@ namespace AutoDriveCode {
 		void ExecuteEventResizeVisualizer();
 		void ExecuteEventPushImagePointCloud();
 		void ExecuteEventPopAllImagePointCloud();
-		void ExecuteEventRegistarteRidarPointCloud();
+		void ExecuteEventRegistarteRidarPointCloud(float leafSize);
 
 
 		void TurnOff();
